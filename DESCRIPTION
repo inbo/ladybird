@@ -1,7 +1,7 @@
 Type: Package
 Package: ladybird
 Title: Analysis of Ladybird Occurrence Data
-Version: 0.0.0
+Version: 0.0.1
 Authors@R:
     c(person(given = "Thierry",
              family = "Onkelinx",
