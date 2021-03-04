@@ -4,8 +4,9 @@
 #'   of location and year.
 #' @export
 #' @importFrom assertthat assert_that is.count
-#' @importFrom dplyr filter group_by n ungroup
+#' @importFrom dplyr filter group_by inner_join n transmute ungroup
 #' @importFrom git2rdata read_vc
+#' @importFrom tidyr pivot_wider
 load_relevant <- function(min_occurrences = 1000, min_species = 3) {
   assert_that(is.count(min_occurrences), is.count(min_species))
   read_vc("occurrence", system.file(package = "ladybird")) %>%
@@ -17,5 +18,13 @@ load_relevant <- function(min_occurrences = 1000, min_species = 3) {
     filter(n() >= min_occurrences) %>%
     group_by(.data$location, .data$year) %>%
     filter(n() >= min_species) %>%
-    ungroup()
+    ungroup() %>%
+    inner_join(
+      read_vc("species", system.file(package = "ladybird")),
+      by = "taxon_key"
+    ) %>%
+    transmute(
+      year, location, species = abbreviate(.data$scientific_name), observed = 1L
+    ) %>%
+    pivot_wider(names_from = species, values_from = observed, values_fill = 0L)
 }

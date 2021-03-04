@@ -1,6 +1,8 @@
 # ladybird 0.0.1
 
-* Add `import_data()`.
+* Create functions:
+    * `import_data()`
+    * `load_relevant()`
 
 # ladybird 0.0.0
 
