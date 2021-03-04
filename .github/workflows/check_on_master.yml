@@ -15,3 +15,4 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
           ORCID_TOKEN: ${{ secrets.ORCID_TOKEN }}
           token: ${{ secrets.pat }}
+          aptget: libudunits2-dev

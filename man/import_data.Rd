@@ -4,12 +4,17 @@
 \alias{import_data}
 \title{Import and standardise the raw data}
 \usage{
-import_data(belgium, output)
+import_data(belgium, output, strict = TRUE)
 }
 \arguments{
 \item{belgium}{path to the CSV file with the Belgian data.}
 
 \item{output}{path to the root of the data package}
+
+\item{strict}{What to do when the metadata changes. \code{strict = FALSE}
+overwrites the data and the metadata with a warning listing the changes,
+\code{strict = TRUE} returns an error and leaves the data and metadata as is.
+Defaults to \code{TRUE}.}
 }
 \description{
 Import and standardise the raw data

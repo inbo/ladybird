@@ -1,7 +1,7 @@
 Type: Package
 Package: ladybird
 Title: Analysis of Ladybird Occurrence Data
-Version: 0.0.0
+Version: 0.0.1
 Authors@R:
     c(person(given = "Thierry",
              family = "Onkelinx",
@@ -14,13 +14,23 @@ Authors@R:
 Description: Analysis of ladybird occurrence data from Belgium, the
     Netherlands and the UK since 1990.
 License: GPL-3
+URL: https://inbo.github.io/ladybird
+BugReports: https://github.com/inbo/ladybird/issues
 Imports: 
     assertthat,
     dplyr,
     git2rdata,
+    leaflet,
     readr,
     rlang,
-    sf
+    sf,
+    shiny,
+    tidyr
+Suggests:
+    INBOtheme,
+    plotly
+Remotes:
+    inbo/inbotheme
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

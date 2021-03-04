@@ -1,0 +1,96 @@
+---
+title: "Exploratory data analysis"
+author: "Thierry Onkelinx"
+date: "4-3-2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(ladybird)
+library(plotly)
+library(INBOtheme)
+min_occurrences <- 1000
+min_species <- 3
+```
+
+## Selection criteria for relevant data
+
+- at least `r min_occurrences` occurrences per species.
+- at least `r min_species` observed species per combination of year and location.
+
+We check both criteria twice.
+Removing year - location combinations with less than `r min_species` can reduce the number of occurrences of some species.
+Removing species with less than `r min_occurrences` occurrences can reduce the number of species for some year - location combinations.
+
+```{r load-data}
+relevant <- load_relevant(
+  min_occurrences = min_occurrences, min_species = min_species
+)
+```
+
+```{r locations}
+p <- relevant %>%
+  count(year) %>%
+  ggplot(aes(x = year, y = n)) +
+  geom_line() +
+  ggtitle("number of relevant locations") +
+  theme(axis.title = element_blank())
+ggplotly(p, dynamicTicks = TRUE)
+```
+
+```{r number-species}
+p <- relevant %>%
+  pivot_longer(
+    c(-year, -location), names_to = "species", values_to = "observed"
+  ) %>%
+  filter(observed  == 1) %>%
+  count(year, location) %>%
+  group_by(year) %>%
+  summarise(
+    mean = mean(n),
+    lcl = quantile(n, 0.05),
+    ucl = quantile(n, 0.95)
+  ) %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_pointrange() +
+  ggtitle("Number of species per location (average, 5% and 95% quantile)") + 
+  theme(axis.title = element_blank())
+ggplotly(p, dynamicTicks = TRUE)
+```
+
+```{r high-observed}
+relevant %>%
+  pivot_longer(
+    c(-year, -location), names_to = "species", values_to = "observed"
+  ) %>%
+  group_by(year, species) %>%
+  summarise(proportion = mean(observed), .groups = "drop") -> proportions
+proportions %>%
+  filter(year == max(year), species != "Hrma") %>%
+  filter(proportion >= median(proportion)) -> top_species
+p <- proportions %>%
+  filter(species %in% c(top_species$species, "Hrma")) %>%
+  mutate(Harmonia  = species == "Hrma") %>%
+  ggplot(aes(x = year, y = proportion, colour = species, linetype = Harmonia)) +
+  geom_line() +
+  theme(axis.title = element_blank()) +
+  ggtitle("Evolution of species with highest observed proportion in 2020")
+ggplotly(p, dynamicTicks = TRUE) %>%
+  layout(yaxis = list(tickformat = "%"))
+```
+
+```{r low-observed}
+p <- proportions %>%
+  filter(!species %in% top_species$species) %>%
+  mutate(Harmonia  = species == "Hrma") %>%
+  ggplot(aes(x = year, y = proportion, colour = species, linetype = Harmonia)) +
+  geom_line() +
+  theme(axis.title = element_blank()) +
+  ggtitle("Evolution of species with lowest observed proportion in 2020")
+ggplotly(p, dynamicTicks = TRUE) %>%
+  layout(yaxis = list(tickformat = "%"))
+```
+
