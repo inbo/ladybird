@@ -3,6 +3,7 @@
 * Create functions:
     * `import_data()`
     * `load_relevant()`
+    * `occurrence_map()`
 
 # ladybird 0.0.0
 

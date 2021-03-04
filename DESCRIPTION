@@ -20,9 +20,11 @@ Imports:
     assertthat,
     dplyr,
     git2rdata,
+    leaflet,
     readr,
     rlang,
     sf,
+    shiny,
     tidyr
 Suggests:
     INBOtheme,
