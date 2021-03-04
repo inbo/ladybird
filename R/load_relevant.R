@@ -24,7 +24,10 @@ load_relevant <- function(min_occurrences = 1000, min_species = 3) {
       by = "taxon_key"
     ) %>%
     transmute(
-      year, location, species = abbreviate(.data$scientific_name), observed = 1L
+      .data$year, .data$location, species = abbreviate(.data$scientific_name),
+      observed = 1L
     ) %>%
-    pivot_wider(names_from = species, values_from = observed, values_fill = 0L)
+    pivot_wider(
+      names_from = .data$species, values_from = .data$observed, values_fill = 0L
+    )
 }
