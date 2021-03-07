@@ -17,6 +17,7 @@ License: GPL-3
 URL: https://inbo.github.io/ladybird
 BugReports: https://github.com/inbo/ladybird/issues
 Imports: 
+    INLA,
     assertthat,
     dplyr,
     git2rdata,
@@ -30,7 +31,8 @@ Suggests:
     INBOtheme,
     plotly
 Remotes:
-    inbo/inbotheme
+    inbo/inbotheme,
+    inbo/INLA
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
