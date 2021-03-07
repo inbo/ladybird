@@ -26,9 +26,9 @@ secondary_model <- function(
     assert_that(has_name(secondary, "species"))
     assert_that(species != secondary$species)
     assert_that(has_name(secondary, "min_occurrences"))
-    assert_that(min_occurrences != secondary$min_occurrences)
+    assert_that(min_occurrences == secondary$min_occurrences)
     assert_that(has_name(secondary, "min_species"))
-    assert_that(min_species != secondary$min_species)
+    assert_that(min_species == secondary$min_species)
     assert_that(has_name(secondary, "predictions"))
   }
   read_vc("location", system.file(package = "ladybird")) %>%
@@ -52,7 +52,7 @@ secondary_model <- function(
     mutate(cyear = .data$year - min(.data$year) + 1) %>%
     inner_join(
       secondary$predictions %>%
-        select(.data$year, .data$location, secondary = .data$mean),
+        select(.data$year, .data$location, secondary = .data$lp_mean),
       by = c("year", "location")
     ) -> base_data
   n_year <- max(base_data$cyear)
@@ -89,7 +89,8 @@ secondary_model <- function(
     summarise(
       median = quantile(.data$secondary, probs = 0.5),
       lcl = quantile(.data$secondary, probs = 0.025),
-      ucl = quantile(.data$secondary, probs = 0.975)
+      ucl = quantile(.data$secondary, probs = 0.975),
+      without = NA_real_
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     mutate(cyear = .data$year - min(.data$year) + 1) %>%

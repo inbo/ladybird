@@ -95,16 +95,20 @@ base_model <- function(
   index_estimate <- inla.stack.index(stack, "estimate")$data
   model$summary.fitted.values[index_estimate, ] %>%
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
-    bind_cols(base_data) %>%
     as_tibble() %>%
-    select(
-      .data$year, .data$location, .data$mean, .data$median, .data$lcl, .data$ucl
+    bind_cols(
+      model$summary.linear.predictor[index_estimate, ] %>%
+        select(lp_mean = .data$mean, lp_median = 4, lp_lcl = 3, lp_ucl = 5),
+      base_data %>%
+        select(.data$year, .data$location)
     ) -> predictions
   index_trend <- inla.stack.index(stack, "trend")$data
   model$summary.fitted.values[index_trend, ] %>%
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
     as_tibble() %>%
     bind_cols(
+      model$summary.linear.predictor[index_trend, ] %>%
+        select(lp_mean = .data$mean, lp_median = 4, lp_lcl = 3, lp_ucl = 5),
       base_data %>%
         distinct(.data$year) %>%
         arrange(.data$year)
