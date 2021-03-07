@@ -2,6 +2,7 @@
 
 * Create functions:
     * `base_model()`
+    * `secundary_model()`
 
 # ladybird 0.0.1
 
