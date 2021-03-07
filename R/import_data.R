@@ -42,6 +42,9 @@ import_data <- function(belgium, output, strict = TRUE) {
     ) -> raw_data
   raw_data %>%
     distinct(.data$taxon_key, .data$scientific_name) %>%
+    mutate(
+      code = gsub("^(.{4}).* (.{4}).*$", "\\1_\\2", .data$scientific_name)
+    ) %>%
     write_vc(
       file = "inst/species", root = root, sorting = "taxon_key", stage = TRUE,
       strict = strict

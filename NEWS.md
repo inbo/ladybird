@@ -3,6 +3,8 @@
 * Create functions:
     * `base_model()`
     * `secundary_model()`
+* `import_data()` creates a code for the species based on their scientific name.
+* Add more Belgian data.
 
 # ladybird 0.0.1
 

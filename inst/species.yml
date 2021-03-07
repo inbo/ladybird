@@ -3,8 +3,8 @@
   optimize: yes
   NA string: NA
   sorting: taxon_key
-  hash: 1ad799d8b065b96cdaff5b1467dff0f5c3e73128
-  data_hash: a0fee5be5ed912f2349eecde5c7491a27997f767
+  hash: d08d4c557db3ff259c83e26824f2fb8f67174cc3
+  data_hash: 2d1fb5d3559a802f5c71f07902c50cdbf182a630
 taxon_key:
   class: factor
   labels:
@@ -35,6 +35,7 @@ taxon_key:
   - '4990184'
   - '4990191'
   - '4990195'
+  - '5749357'
   - '5749359'
   - '5749361'
   - '5749408'
@@ -43,6 +44,7 @@ taxon_key:
   - '5877911'
   - '5877963'
   - '6097844'
+  - '8765358'
   index:
   - 1
   - 2
@@ -71,6 +73,7 @@ taxon_key:
   - 25
   - 26
   - 27
+  - 36
   - 28
   - 29
   - 30
@@ -79,6 +82,9 @@ taxon_key:
   - 33
   - 34
   - 35
+  - 37
   ordered: no
 scientific_name:
+  class: character
+code:
   class: character
