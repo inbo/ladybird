@@ -4,7 +4,7 @@
 \alias{base_model}
 \title{Fit a base model to a species}
 \usage{
-base_model(species = "Hrma", min_occurrences = 1000, min_species = 3)
+base_model(species = "Harm_axyr", min_occurrences = 1000, min_species = 3)
 }
 \arguments{
 \item{species}{Name of the species}

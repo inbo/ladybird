@@ -5,7 +5,7 @@
 \title{Fit a model to a species using the predictions for a secundary species}
 \usage{
 secondary_model(
-  species = "Adld",
+  species = "Adal_dece",
   min_occurrences = 1000,
   min_species = 3,
   secondary

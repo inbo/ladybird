@@ -11,7 +11,7 @@
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 base_model <- function(
-  species = "Hrma", min_occurrences = 1000, min_species = 3
+  species = "Harm_axyr", min_occurrences = 1000, min_species = 3
 ) {
   read_vc("location", system.file(package = "ladybird")) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%

@@ -13,12 +13,12 @@
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 secondary_model <- function(
-  species = "Adld", min_occurrences = 1000, min_species = 3, secondary
+  species = "Adal_dece", min_occurrences = 1000, min_species = 3, secondary
 ) {
   assert_that(is.string(species))
   if (missing(secondary)) {
     secondary <- base_model(
-      species = "Hrma", min_occurrences = min_occurrences,
+      species = "Harm_axyr", min_occurrences = min_occurrences,
       min_species = min_species
     )
   } else {
