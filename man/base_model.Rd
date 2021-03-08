@@ -8,7 +8,7 @@ base_model(
   species = "Harm_axyr",
   min_occurrences = 1000,
   min_species = 3,
-  rw_order = 1:2
+  first_order = TRUE
 )
 }
 \arguments{
@@ -19,8 +19,9 @@ base_model(
 \item{min_species}{The minimum number of species recorded at the combination
 of location and year.}
 
-\item{rw_order}{What order to use for the random walk along time.
-Options are \code{1} (default) and \code{2}.}
+\item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
+for the year component.
+Defaults to \code{TRUE}.}
 }
 \description{
 Fit a base model to a species

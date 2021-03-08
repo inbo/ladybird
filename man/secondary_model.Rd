@@ -8,18 +8,23 @@ secondary_model(
   species = "Adal_dece",
   min_occurrences = 1000,
   min_species = 3,
-  secondary
+  secondary,
+  first_order = TRUE
 )
 }
 \arguments{
-\item{species}{Name of the species}
+\item{species}{Name of the species.}
 
 \item{min_occurrences}{The minimum number of occurrences per species.}
 
 \item{min_species}{The minimum number of species recorded at the combination
 of location and year.}
 
-\item{secondary}{the output of \code{base_model()} for a different species}
+\item{secondary}{The output of \code{base_model()} for a different species.}
+
+\item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
+for the year component.
+Defaults to \code{TRUE}.}
 }
 \description{
 Fit a model to a species using the predictions for a secundary species

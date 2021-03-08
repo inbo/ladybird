@@ -1,9 +1,11 @@
 #' Fit a base model to a species
 #' @param species Name of the species.
 #' @inheritParams load_relevant
-#' @param rw_order What order to use for the random walk along time.
-#' Options are `1` (default) and `2`.
+#' @param first_order Use first (`TRUE`) or second (`FALSE`) order random walk
+#' for the year component.
+#' Defaults to `TRUE`.
 #' @export
+#' @importFrom assertthat assert_that is.flag noNA
 #' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join mutate
 #' select %>%
 #' @importFrom git2rdata read_vc
@@ -16,14 +18,15 @@
 #' @importFrom tidyr complete
 base_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
-  rw_order = 1:2
+  first_order = TRUE
 ) {
-  rw_order <- match.arg(rw_order)
+  assert_that(is.flag(first_order), noNA(first_order))
   read_vc("location", system.file(package = "ladybird")) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-    st_transform(crs = 31370) %>%
+    st_transform(crs = 31370) -> base_data
+  base_data %>%
     bind_cols(
-      st_coordinates(.data) %>%
+      st_coordinates(base_data) %>%
         as.data.frame()
     ) %>%
     st_drop_geometry() %>%
@@ -110,7 +113,8 @@ base_model <- function(
   inla.stack(stack_estimate, stack_trend) -> stack
   inla.stack(stack_estimate, stack_prediction) -> stack2
   fixed_formula <- "occurrence ~ 0 + intercept"
-  rw_formula <- c(
+  rw_formula <- ifelse(
+    first_order,
     "f(
       cyear, model = \"rw1\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.05)))
@@ -119,7 +123,7 @@ base_model <- function(
       cyear, model = \"rw2\",
       hyper = list(theta = list(prior = \"pc.prec\", param = c(0.02, 0.05)))
     )"
-  )[rw_order]
+  )
   st_formula <- "f(
       site, model = spde, group = site.group,
       control.group = list(
@@ -172,7 +176,7 @@ base_model <- function(
       species = species, min_occurrences = min_occurrences,
       min_species = min_species, fixed = m0$summary.fixed, trend = trend,
       hyperpar = m0$summary.hyperpar, predictions = predictions,
-      waic = m1$waic$waic, rw_order = rw_order
+      waic = m1$waic$waic, first_order = first_order
     )
   )
 }
