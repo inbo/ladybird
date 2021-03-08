@@ -1,6 +1,8 @@
 #' Fit a base model to a species
-#' @param species Name of the species
+#' @param species Name of the species.
 #' @inheritParams load_relevant
+#' @param rw_order What order to use for the random walk along time.
+#' Options are `1` (default) and `2`.
 #' @export
 #' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join mutate
 #' select %>%
@@ -10,15 +12,18 @@
 #' inla.stack.index
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom stats as.formula
 #' @importFrom tidyr complete
 base_model <- function(
-  species = "Harm_axyr", min_occurrences = 1000, min_species = 3
+  species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
+  rw_order = 1:2
 ) {
+  rw_order <- match.arg(rw_order)
   read_vc("location", system.file(package = "ladybird")) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
     st_transform(crs = 31370) %>%
     bind_cols(
-      st_coordinates(.) %>%
+      st_coordinates(.data) %>%
         as.data.frame()
     ) %>%
     st_drop_geometry() %>%
@@ -104,18 +109,26 @@ base_model <- function(
   ) -> stack_prediction
   inla.stack(stack_estimate, stack_trend) -> stack
   inla.stack(stack_estimate, stack_prediction) -> stack2
-  model_formula <- occurrence ~ 0 + intercept +
-    f(
-      cyear, model = "rw1",
-      hyper = list(theta = list(prior = "pc.prec", param = c(0.1, 0.05)))
-    ) +
-    f(
+  fixed_formula <- "occurrence ~ 0 + intercept"
+  rw_formula <- c(
+    "f(
+      cyear, model = \"rw1\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.05)))
+    ) +",
+    "f(
+      cyear, model = \"rw2\",
+      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.02, 0.05)))
+    )"
+  )[rw_order]
+  st_formula <- "f(
       site, model = spde, group = site.group,
       control.group = list(
-        model = "ar1",
-        hyper = list(theta = list(prior = "pc.cor1", param = c(0.6, 0.7)))
+        model = \"ar1\",
+        hyper = list(theta = list(prior = \"pc.cor1\", param = c(0.6, 0.7)))
       )
-    )
+    )"
+  paste(fixed_formula, rw_formula, st_formula, sep = " +\n") %>%
+    as.formula() -> model_formula
   m0 <- inla(
     model_formula, family = "binomial", data = inla.stack.data(stack_estimate),
     control.predictor = list(A = inla.stack.A(stack_estimate), compute = FALSE)
@@ -159,7 +172,7 @@ base_model <- function(
       species = species, min_occurrences = min_occurrences,
       min_species = min_species, fixed = m0$summary.fixed, trend = trend,
       hyperpar = m0$summary.hyperpar, predictions = predictions,
-      waic = m1$waic$waic
+      waic = m1$waic$waic, rw_order = rw_order
     )
   )
 }

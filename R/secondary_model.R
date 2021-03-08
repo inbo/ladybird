@@ -5,13 +5,15 @@
 #' @export
 #' @importFrom assertthat assert_that has_name is.string
 #' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join mutate
-#' select %>%
+#' select summarise %>%
 #' @importFrom git2rdata read_vc
 #' @importFrom INLA inla inla.mesh.1d inla.mesh.2d inla.spde2.pcmatern
 #' inla.spde.make.A inla.spde.make.index inla.stack inla.stack.A inla.stack.data
 #' inla.stack.index
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom tidyr pivot_longer
+#' @importFrom stats median
 secondary_model <- function(
   species = "Adal_dece", min_occurrences = 1000, min_species = 3, secondary
 ) {
@@ -35,7 +37,7 @@ secondary_model <- function(
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
     st_transform(crs = 31370) %>%
     bind_cols(
-      st_coordinates(.) %>%
+      st_coordinates(.data) %>%
         `/`(1e3) %>%
         as.data.frame()
     ) %>%
@@ -87,10 +89,9 @@ secondary_model <- function(
   base_data %>%
     group_by(.data$year) %>%
     summarise(
-      median = quantile(.data$secondary, probs = 0.5),
-      lcl = quantile(.data$secondary, probs = 0.025),
-      ucl = quantile(.data$secondary, probs = 0.975),
-      without = NA_real_
+      median = median(.data$secondary, na.rm = TRUE),
+      min = min(.data$secondary, na.rm = TRUE),
+      max = max(.data$secondary, na.rm = TRUE), without = 0
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     mutate(cyear = .data$year - min(.data$year) + 1) %>%

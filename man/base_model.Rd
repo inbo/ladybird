@@ -4,15 +4,23 @@
 \alias{base_model}
 \title{Fit a base model to a species}
 \usage{
-base_model(species = "Harm_axyr", min_occurrences = 1000, min_species = 3)
+base_model(
+  species = "Harm_axyr",
+  min_occurrences = 1000,
+  min_species = 3,
+  rw_order = 1:2
+)
 }
 \arguments{
-\item{species}{Name of the species}
+\item{species}{Name of the species.}
 
 \item{min_occurrences}{The minimum number of occurrences per species.}
 
 \item{min_species}{The minimum number of species recorded at the combination
 of location and year.}
+
+\item{rw_order}{What order to use for the random walk along time.
+Options are \code{1} (default) and \code{2}.}
 }
 \description{
 Fit a base model to a species
