@@ -10,6 +10,7 @@
 #' inla.stack.index
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom tidyr complete
 base_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3
 ) {
@@ -18,7 +19,6 @@ base_model <- function(
     st_transform(crs = 31370) %>%
     bind_cols(
       st_coordinates(.) %>%
-        `/`(1e3) %>%
         as.data.frame()
     ) %>%
     st_drop_geometry() %>%
@@ -31,7 +31,10 @@ base_model <- function(
     select(
       .data$year, .data$location, .data$X, .data$Y, occurrence = !!species
     ) %>%
-    mutate(cyear = .data$year - min(.data$year) + 1) -> base_data
+    mutate(
+      X = .data$X / 1e3, Y = .data$Y / 1e3,
+      cyear = .data$year - min(.data$year) + 1
+    ) -> base_data
   n_year <- max(base_data$cyear)
   year_interval <- 5
   seq(year_interval / 2, n_year, by = year_interval) %>%
@@ -68,46 +71,84 @@ base_model <- function(
       list(
         base_data %>%
           distinct(.data$cyear) %>%
-          arrange(.data$cyear)
+          arrange(.data$cyear) %>%
+          mutate(intercept = 1)
       )
     ),
     tag = "trend"
   ) -> stack_trend
+  base_data %>%
+    distinct(.data$location, .data$year) %>%
+    complete(.data$location, .data$year) %>%
+    inner_join(
+      base_data %>%
+        distinct(.data$location, .data$X, .data$Y),
+      by = "location"
+    ) %>%
+    mutate(cyear = .data$year - min(.data$year) + 1) %>%
+    arrange(.data$location, .data$year) -> base_prediction
+  base_prediction %>%
+    select(.data$X, .data$Y) %>%
+    as.matrix() %>%
+    inla.spde.make.A(
+      mesh = mesh, group = base_prediction$cyear, mesh.group = time_mesh
+    ) -> a_prediction
+  inla.stack(
+    data = data.frame(occurrence = NA),
+    A = list(a_prediction, 1),
+    effects = list(
+      c(site_index, list(intercept = 1)),
+      list(select(base_prediction, .data$cyear))
+    ),
+    tag = "prediction"
+  ) -> stack_prediction
   inla.stack(stack_estimate, stack_trend) -> stack
-  model <- inla(
-    occurrence ~ 0 + intercept +
-      f(
-        cyear, model = "rw1",
-        hyper = list(theta = list(prior = "pc.prec", param = c(0.1, 0.05)))
-      ) +
-      f(
-        site, model = spde, group = site.group,
-        control.group = list(
-          model = "ar1",
-          hyper = list(theta = list(prior = "pc.cor1", param = c(0.6, 0.7)))
-        )
-      ),
-    family = "binomial",
-    data = inla.stack.data(stack),
-    control.compute = list(waic = TRUE),
-    control.predictor = list(A = inla.stack.A(stack), compute = TRUE, link = 1)
+  inla.stack(stack_estimate, stack_prediction) -> stack2
+  model_formula <- occurrence ~ 0 + intercept +
+    f(
+      cyear, model = "rw1",
+      hyper = list(theta = list(prior = "pc.prec", param = c(0.1, 0.05)))
+    ) +
+    f(
+      site, model = spde, group = site.group,
+      control.group = list(
+        model = "ar1",
+        hyper = list(theta = list(prior = "pc.cor1", param = c(0.6, 0.7)))
+      )
+    )
+  m0 <- inla(
+    model_formula, family = "binomial", data = inla.stack.data(stack_estimate),
+    control.predictor = list(A = inla.stack.A(stack_estimate), compute = FALSE)
   )
-  index_estimate <- inla.stack.index(stack, "estimate")$data
-  model$summary.fitted.values[index_estimate, ] %>%
+  m1 <- inla(
+    model_formula, family = "binomial", data = inla.stack.data(stack),
+    control.compute = list(waic = TRUE),
+    control.predictor = list(A = inla.stack.A(stack), compute = TRUE, link = 1),
+    control.mode = list(theta = m0$mode$theta, restart = FALSE, fixed = TRUE)
+  )
+  m2 <- inla(
+    model_formula, family = "binomial", data = inla.stack.data(stack2),
+    control.predictor = list(
+      A = inla.stack.A(stack2), compute = TRUE, link = 1
+    ),
+    control.mode = list(theta = m0$mode$theta, restart = FALSE, fixed = TRUE)
+  )
+  index_estimate <- inla.stack.index(stack2, "prediction")$data
+  m2$summary.fitted.values[index_estimate, ] %>%
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
     as_tibble() %>%
     bind_cols(
-      model$summary.linear.predictor[index_estimate, ] %>%
+      m2$summary.linear.predictor[index_estimate, ] %>%
         select(lp_mean = .data$mean, lp_median = 4, lp_lcl = 3, lp_ucl = 5),
-      base_data %>%
+      base_prediction %>%
         select(.data$year, .data$location)
     ) -> predictions
   index_trend <- inla.stack.index(stack, "trend")$data
-  model$summary.fitted.values[index_trend, ] %>%
+  m1$summary.fitted.values[index_trend, ] %>%
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
     as_tibble() %>%
     bind_cols(
-      model$summary.linear.predictor[index_trend, ] %>%
+      m1$summary.linear.predictor[index_trend, ] %>%
         select(lp_mean = .data$mean, lp_median = 4, lp_lcl = 3, lp_ucl = 5),
       base_data %>%
         distinct(.data$year) %>%
@@ -116,9 +157,9 @@ base_model <- function(
   return(
     list(
       species = species, min_occurrences = min_occurrences,
-      min_species = min_species, fixed = model$summary.fixed, trend = trend,
-      hyperpar = model$summary.hyperpar, predictions = predictions,
-      waic = model$waic$waic
+      min_species = min_species, fixed = m0$summary.fixed, trend = trend,
+      hyperpar = m0$summary.hyperpar, predictions = predictions,
+      waic = m1$waic$waic
     )
   )
 }
