@@ -8,6 +8,16 @@ Authors@R:
              role = c("aut", "cre"),
              email = "thierry.onkelinx@inbo.be",
              comment = c(ORCID = "0000-0001-8804-4216")),
+      person(given = "Tim",
+             family = "Adriaens",
+             role = "aut",
+             email = "tim.adriaens@inbo.be",
+             comment = c(ORCID = "0000-0001-7268-4200")),
+      person(given = "Dirk",
+             family = "Maes",
+             role = "aut",
+             email = "dirk.maes@inbo.be",
+             comment = c(ORCID = "0000-0002-7947-3788")),
       person(given = "Research Institute for Nature and Forest",
              role = c("cph", "fnd"),
              email = "info@inbo.be"))
@@ -28,13 +38,13 @@ Imports:
     shiny,
     tidyr
 Suggests:
-    here,
     INBOtheme,
+    here,
     plotly,
     scales
 Remotes:
-    inbo/inbotheme,
-    inbo/INLA
+    inbo/INLA,
+    inbo/inbotheme
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
