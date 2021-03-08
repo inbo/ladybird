@@ -28,6 +28,7 @@ Imports:
     shiny,
     tidyr
 Suggests:
+    here,
     INBOtheme,
     plotly
 Remotes:
