@@ -30,7 +30,8 @@ Imports:
 Suggests:
     here,
     INBOtheme,
-    plotly
+    plotly,
+    scales
 Remotes:
     inbo/inbotheme,
     inbo/INLA
