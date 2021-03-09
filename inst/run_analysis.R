@@ -18,20 +18,21 @@ for (species in available_species) {
   if (file.exists(output)) {
     next
   }
-  message("base: ", species)
+  message("base: ", species, " ", first_order)
   bm <- base_model(
     species = species, min_occurrences = min_occurrences,
     min_species = min_species, first_order = first_order
   )
   saveRDS(bm, output)
 }
-dir.create(file.path(output_dir, "..", "secondary"), showWarnings = FALSE)
 bm <- readRDS(
   sprintf(
     "%s/%s_%i_%i_%i.rds", output_dir, "harm_axyr", min_occurrences, min_species,
     first_order
   )
 )
+
+dir.create(file.path(output_dir, "..", "secondary"), showWarnings = FALSE)
 for (species in available_species) {
   if (species == "Harm_axyr") {
     next
@@ -43,8 +44,28 @@ for (species in available_species) {
   if (file.exists(output)) {
     next
   }
-  message("secondary: ", species)
+  message("secondary: ", species, " ", first_order)
   sm <- secondary_model(
+    species = species, min_occurrences = min_occurrences,
+    min_species = min_species, secondary = bm, first_order = first_order
+  )
+  saveRDS(sm, output)
+}
+
+dir.create(file.path(output_dir, "..", "cumulative"), showWarnings = FALSE)
+for (species in available_species) {
+  if (species == "Harm_axyr") {
+    next
+  }
+  output <- sprintf(
+    "%s/%s_%i_%i_%i.rds", file.path(output_dir, "..", "cumulative"),
+    tolower(species), min_occurrences, min_species, first_order
+  )
+  if (file.exists(output)) {
+    next
+  }
+  message("cumulative: ", species, " ", first_order)
+  sm <- cumulative_model(
     species = species, min_occurrences = min_occurrences,
     min_species = min_species, secondary = bm, first_order = first_order
   )
@@ -60,7 +81,7 @@ for (species in available_species) {
   if (file.exists(output)) {
     next
   }
-  message("base: ", species)
+  message("base: ", species, " ", first_order)
   bm <- base_model(
     species = species, min_occurrences = min_occurrences,
     min_species = min_species, first_order = first_order
@@ -73,6 +94,7 @@ bm <- readRDS(
     first_order
   )
 )
+
 for (species in available_species) {
   if (species == "Harm_axyr") {
     next
@@ -84,8 +106,28 @@ for (species in available_species) {
   if (file.exists(output)) {
     next
   }
-  message("secondary: ", species)
+  message("secondary: ", species, " ", first_order)
   sm <- secondary_model(
+    species = species, min_occurrences = min_occurrences,
+    min_species = min_species, secondary = bm, first_order = first_order
+  )
+  saveRDS(sm, output)
+}
+
+dir.create(file.path(output_dir, "..", "cumulative"), showWarnings = FALSE)
+for (species in available_species) {
+  if (species == "Harm_axyr") {
+    next
+  }
+  output <- sprintf(
+    "%s/%s_%i_%i_%i.rds", file.path(output_dir, "..", "cumulative"),
+    tolower(species), min_occurrences, min_species, first_order
+  )
+  if (file.exists(output)) {
+    next
+  }
+  message("cumulative: ", species, " ", first_order)
+  sm <- cumulative_model(
     species = species, min_occurrences = min_occurrences,
     min_species = min_species, secondary = bm, first_order = first_order
   )
