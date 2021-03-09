@@ -2,15 +2,9 @@ description: Configuration file for checklist::check_pkg()
 package: yes
 allowed:
   warnings:
-  - motivation: Unit test are overkill for an analysis package.
+  - motivation: Package not intended for CRAN.
     value: |-
-      checking for code which exercises the package ... WARNING
-      No examples, no tests, no vignettes
-  notes:
-  - motivation: Package not intended for CRAN. Remote required for INBOtheme. Merging
-      this branch into master will generate the missing URL.
-    value: |-
-      checking CRAN incoming feasibility ... NOTE
+      checking CRAN incoming feasibility ... WARNING
       Maintainer: ‘Thierry Onkelinx <thierry.onkelinx@inbo.be>’
 
       New submission
@@ -18,6 +12,8 @@ allowed:
       Unknown, possibly mis-spelled, fields in DESCRIPTION:
         ‘Remotes’
 
+      Strong dependencies not in mainstream repositories:
+        INLA
       Suggests or Enhances not in mainstream repositories:
         INBOtheme
 
@@ -26,3 +22,8 @@ allowed:
           From: DESCRIPTION
           Status: 404
           Message: Not Found
+  - motivation: Unit test are overkill for an analysis package.
+    value: |-
+      checking for code which exercises the package ... WARNING
+      No examples, no tests, no vignettes
+  notes: []

@@ -14,7 +14,7 @@
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom tidyr pivot_longer
-#' @importFrom stats median
+#' @importFrom stats median qlogis
 secondary_model <- function(
   species = "Adal_dece", min_occurrences = 1000, min_species = 3, secondary,
   first_order = TRUE

@@ -65,7 +65,7 @@ cumulative_model <- function(
     inner_join(
       secondary$predictions %>%
         select(.data$year, .data$location, secondary = .data$mean) %>%
-        arrange(year) %>%
+        arrange(.data$year) %>%
         group_by(.data$location) %>%
         mutate(secondary = cumsum(.data$secondary)) %>%
         ungroup(),
