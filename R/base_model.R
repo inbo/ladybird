@@ -12,6 +12,7 @@
 #' @importFrom INLA inla inla.mesh.1d inla.mesh.2d inla.spde2.pcmatern
 #' inla.spde.make.A inla.spde.make.index inla.stack inla.stack.A inla.stack.data
 #' inla.stack.index
+#' @importFrom pROC roc
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom stats as.formula
@@ -150,6 +151,12 @@ base_model <- function(
     ),
     control.mode = list(theta = m0$mode$theta, restart = FALSE, fixed = TRUE)
   )
+  index_auc <- inla.stack.index(stack2, "estimate")$data
+  roc_curve <- roc(
+    predictor = m2$summary.fitted.values[index_auc, "mean"],
+    response = base_data$occurrence,
+    levels = c(0, 1), direction = "<", ci = TRUE
+  )
   index_estimate <- inla.stack.index(stack2, "prediction")$data
   m2$summary.fitted.values[index_estimate, ] %>%
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
@@ -176,7 +183,7 @@ base_model <- function(
       species = species, min_occurrences = min_occurrences,
       min_species = min_species, fixed = m0$summary.fixed, trend = trend,
       hyperpar = m0$summary.hyperpar, predictions = predictions,
-      waic = m1$waic$waic, first_order = first_order
+      waic = m1$waic$waic, first_order = first_order, roc = roc_curve
     )
   )
 }
