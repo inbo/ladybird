@@ -99,7 +99,8 @@ secondary_model <- function(
     summarise(
       median = median(.data$secondary, na.rm = TRUE),
       min = min(.data$secondary, na.rm = TRUE),
-      max = max(.data$secondary, na.rm = TRUE), without = 0
+      max = max(.data$secondary, na.rm = TRUE),
+      without = qlogis(0.001)
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     mutate(

@@ -132,7 +132,7 @@ sec_fixed %>%
 ## General trends
 
 - **occurrence median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
-- **occurrence without**: prediction assuming the predicted occurrence of _H. axyridis_ is zero
+- **occurrence without**: prediction assuming the predicted occurrence of _H. axyridis_ is 0.1%
 
 ```{r trends-adal-bipu}
 plot_trend <- function(this_species) {
