@@ -68,13 +68,40 @@ map(secondary_models, "trend") %>%
   mutate(model = "occurrence") -> sec_trend
 ```
 
+
+```{r load-cumulative-models}
+dirname(params$models) %>%
+  file.path("..", "cumulative") %>%
+  list.files(full.names = TRUE) %>%
+  map(readRDS) -> cumulative_models
+cum_species <- map_chr(cumulative_models, "species")
+cum_waic <- map_dbl(cumulative_models, "waic")
+map_lgl(cumulative_models, "first_order") %>%
+  ifelse(1, 2) -> cum_rw_order
+map(cumulative_models, "fixed") %>%
+  map(rownames_to_column, var = "parameter") %>%
+  map2(cum_species, ~mutate(.x, species = .y)) %>%
+  map2(cum_rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() -> cum_fixed
+map(cumulative_models, "hyperpar") %>%
+  map(rownames_to_column, var = "parameter") %>%
+  map2(cum_species, ~mutate(.x, species = .y)) %>%
+  map2(cum_rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() %>%
+  mutate(model = "cumulative") -> cum_hyperpar
+map(cumulative_models, "trend") %>%
+  map2(cum_species, ~mutate(.x, species = .y)) %>%
+  map2(cum_rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() %>%
+  mutate(model = "cumulative") -> cum_trend
+```
 ```{r combined}
 trend %>%
   mutate(type = "") %>%
-  bind_rows(sec_trend) %>%
+  bind_rows(sec_trend, cum_trend) %>%
   mutate(prediction = interaction(model, type, sep = " ")) -> all_trend
 hyperpar %>%
-  bind_rows(sec_hyperpar) -> all_hyperpar
+  bind_rows(sec_hyperpar, cum_hyperpar) -> all_hyperpar
 ```
 
 # Compare models
@@ -91,6 +118,10 @@ data.frame(species, waic, rw_order = rw_order, model = "base") %>%
     data.frame(
       species = sec_species, waic = sec_waic, rw_order = sec_rw_order,
       model = "occurrence"
+    ),
+    data.frame(
+      species = cum_species, waic = cum_waic, rw_order = cum_rw_order,
+      model = "cumulative"
     )
   ) %>%
   group_by(species) %>%
@@ -129,10 +160,31 @@ sec_fixed %>%
   theme(axis.title = element_blank())
 ```
 
+```{r cum-fixed, fig.cap = "Parameter estimate when using the cumulative predicted occurrence of H. axyridis as fixed effect covariate."}
+cum_fixed %>%
+  filter(parameter == "secondary") %>%
+  mutate(
+    species = reorder(species, mean),
+    order = factor(rw_order)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = order
+    )
+  ) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme(axis.title = element_blank())
+```
+
 ## General trends
 
-- **occurrence median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
-- **occurrence without**: prediction assuming the predicted occurrence of _H. axyridis_ is 0.1%
+- **median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
+- **without**: prediction assuming the predicted occurrence of _H. axyridis_ is 0.1%
+
+Panels indicate first and second order random walks
 
 ```{r trends-adal-bipu}
 plot_trend <- function(this_species) {
