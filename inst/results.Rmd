@@ -25,22 +25,20 @@ dirname(params$models) %>%
   list.files(full.names = TRUE) %>%
   map(readRDS) -> base_models
 species <- map_chr(base_models, "species")
+waic <- map_dbl(base_models, "waic")
+map_lgl(base_models, "first_order") %>%
+  ifelse(1, 2) -> rw_order
 map(base_models, "hyperpar") %>%
   map(rownames_to_column, var = "parameter") %>%
   map2(species, ~mutate(.x, species = .y)) %>%
+  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
   mutate(model = "base") -> hyperpar
 map(base_models, "trend") %>%
   map2(species, ~mutate(.x, species = .y)) %>%
+  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
   mutate(model = "base") -> trend
-trend %>%
-  filter(species != "Harm_axyr") %>%
-  group_by(species) %>%
-  slice_max(year, n = 1) %>%
-  ungroup() %>%
-  slice_max(mean, prop = 0.5) %>%
-  pull(species) -> top_species
 ```
 
 ```{r load-secondary-models}
@@ -49,26 +47,25 @@ dirname(params$models) %>%
   list.files(full.names = TRUE) %>%
   map(readRDS) -> secondary_models
 sec_species <- map_chr(secondary_models, "species")
+sec_waic <- map_dbl(secondary_models, "waic")
+map_lgl(secondary_models, "first_order") %>%
+  ifelse(1, 2) -> sec_rw_order
 map(secondary_models, "fixed") %>%
   map(rownames_to_column, var = "parameter") %>%
   map2(sec_species, ~mutate(.x, species = .y)) %>%
+  map2(sec_rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() -> sec_fixed
 map(secondary_models, "hyperpar") %>%
   map(rownames_to_column, var = "parameter") %>%
   map2(sec_species, ~mutate(.x, species = .y)) %>%
+  map2(sec_rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
-  mutate(model = "secondary") -> sec_hyperpar
+  mutate(model = "occurrence") -> sec_hyperpar
 map(secondary_models, "trend") %>%
   map2(sec_species, ~mutate(.x, species = .y)) %>%
+  map2(sec_rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
-  mutate(model = "secondary") -> sec_trend
-sec_trend %>%
-  filter(type == "median") %>%
-  group_by(species) %>%
-  slice_max(year, n = 1) %>%
-  ungroup() %>%
-  slice_max(mean, prop = 0.5) %>%
-  pull(species) -> sec_top_species
+  mutate(model = "occurrence") -> sec_trend
 ```
 
 ```{r combined}
@@ -80,20 +77,62 @@ hyperpar %>%
   bind_rows(sec_hyperpar) -> all_hyperpar
 ```
 
+# Compare models
+
+- **base**: intercept + random walk along year + spatiotemporal field
+- **occurrence**: base model + logit predicted probability of _H. axyridis_ as fixed effect
+
+- model **1**: first order random walk
+- model **2**: second order random walk
+
+```{r waic}
+data.frame(species, waic, rw_order = rw_order, model = "base") %>%
+  bind_rows(
+    data.frame(
+      species = sec_species, waic = sec_waic, rw_order = sec_rw_order,
+      model = "occurrence"
+    )
+  ) %>%
+  group_by(species) %>%
+  mutate(
+    waic = waic - min(waic),
+    model = paste(model, rw_order)
+  ) %>%
+  select(-rw_order) %>%
+  pivot_wider(names_from = model, values_from = waic) %>%
+  kable(
+    digits = 1,
+    caption = 
+  "Difference in WAIC compared to the model with lowest WAIC for each species."
+  )
+```
+
+
 # Interactions with _H. axyridis_
 
 ```{r sec-fixed, fig.cap = "Parameter estimate when using the (logit) predicted occurrence of H. axyridis as fixed effect covariate."}
 sec_fixed %>%
   filter(parameter == "secondary") %>%
-  mutate(species = reorder(species, mean)) %>%
-  ggplot(aes(x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species)) +
+  mutate(
+    species = reorder(species, mean),
+    order = factor(rw_order)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = order
+    )
+  ) +
   geom_vline(xintercept = 0, linetype = 2) +
-  geom_errorbarh() +
-  geom_point() +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
   theme(axis.title = element_blank())
 ```
 
 ## General trends
+
+- **occurrence median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
+- **occurrence without**: prediction assuming the predicted occurrence of _H. axyridis_ is zero
 
 ```{r trends-adal-bipu}
 plot_trend <- function(this_species) {
@@ -104,7 +143,8 @@ plot_trend <- function(this_species) {
     geom_line(aes(colour = prediction)) +
     scale_y_continuous(labels = percent, limits = c(0, 1)) +
     theme(axis.title = element_blank()) +
-    ggtitle(this_species)
+    ggtitle(this_species) +
+    facet_wrap(~rw_order)
 }
 plot_trend("Adal_bipu")
 ```
@@ -170,11 +210,14 @@ plot_trend("Tytt_sede")
 ```{r sec-range}
 all_hyperpar %>%
   filter(parameter == "Range for site") %>%
-  mutate(species = reorder(species, mean)) %>%
+  mutate(
+    species = reorder(species, mean),
+    order = factor(rw_order)
+  ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model
+      colour = model, linetype = order, shape = order
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
@@ -187,11 +230,14 @@ all_hyperpar %>%
 ```{r sec-stdev}
 all_hyperpar %>%
   filter(parameter == "Stdev for site") %>%
-  mutate(species = reorder(species, mean)) %>%
+  mutate(
+    species = reorder(species, mean),
+    order = factor(rw_order)
+  ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model
+      colour = model, linetype = order, shape = order
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
@@ -204,11 +250,14 @@ all_hyperpar %>%
 ```{r sec-rho}
 all_hyperpar %>%
   filter(parameter == "GroupRho for site") %>%
-  mutate(species = reorder(species, mean)) %>%
+  mutate(
+    species = reorder(species, mean),
+    order = factor(rw_order)
+  ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model
+      colour = model, linetype = order, shape = order
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
