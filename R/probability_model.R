@@ -1,23 +1,18 @@
-#' Fit a model to a species using the cumulative predictions for a secundary
-#' species
+#' Fit a model to a species using the predictions for a secondary species
 #' @inheritParams base_model
 #' @inheritParams load_relevant
 #' @param secondary The output of `base_model()` for a different species.
 #' @export
 #' @importFrom assertthat assert_that are_equal has_name is.flag is.string noNA
 #' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join mutate
-#' pull select summarise %>%
+#' select summarise %>%
 #' @importFrom git2rdata read_vc
-#' @importFrom INLA inla inla.mesh.1d inla.mesh.2d inla.spde2.pcmatern
-#' inla.spde.make.A inla.spde.make.index inla.stack inla.stack.A inla.stack.data
-#' inla.stack.index
-#' @importFrom pROC roc
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
 #' @importFrom tidyr pivot_longer
 #' @importFrom stats median
-cumulative_model <- function(
-  species = "Adal_bipu", min_occurrences = 1000, min_species = 3, secondary,
+probability_model <- function(
+  species = "Adal_dece", min_occurrences = 1000, min_species = 3, secondary,
   first_order = TRUE, center_year = 2001
 ) {
   assert_that(is.string(species))
@@ -43,12 +38,6 @@ cumulative_model <- function(
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
     st_transform(crs = 31370) %>%
     st_transform(crs = 31370) -> base_data
-  secondary$predictions %>%
-    select(.data$year, .data$location, secondary = .data$mean) %>%
-    arrange(.data$year) %>%
-    group_by(.data$location) %>%
-    mutate(secondary = cumsum(.data$secondary)) %>%
-    ungroup() -> sec_pred
   base_data %>%
     bind_cols(
       st_coordinates(base_data) %>%
@@ -64,20 +53,25 @@ cumulative_model <- function(
     select(
       .data$year, .data$location, .data$X, .data$Y, occurrence = !!species
     ) %>%
-    inner_join(sec_pred, by = c("year", "location")) %>%
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3,
       iyear = .data$year - min(.data$year) + 1,
       iyear2 = .data$iyear,
       before = pmin(.data$year - center_year, 0),
       after = pmax(.data$year - center_year, 0)
+    ) %>%
+    inner_join(
+      secondary$predictions %>%
+        select(.data$year, .data$location, secondary = .data$mean),
+      by = c("year", "location")
     ) -> base_data
   base_data %>%
     group_by(.data$year) %>%
     summarise(
       median = median(.data$secondary, na.rm = TRUE),
       min = min(.data$secondary, na.rm = TRUE),
-      max = max(.data$secondary, na.rm = TRUE), without = 0
+      max = max(.data$secondary, na.rm = TRUE),
+      without = 0
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     mutate(
@@ -96,7 +90,11 @@ cumulative_model <- function(
         distinct(.data$location, .data$X, .data$Y),
       by = "location"
     ) %>%
-    inner_join(sec_pred, by = c("location", "year")) %>%
+    inner_join(
+      secondary$predictions %>%
+        select(.data$year, .data$location, secondary = .data$mean),
+      by = c("year", "location")
+    ) %>%
     mutate(
       iyear = .data$year - min(.data$year) + 1,
       iyear2 = .data$iyear,
@@ -112,7 +110,7 @@ cumulative_model <- function(
     c(
       species = species, secondary = secondary$species,
       min_occurrences = min_occurrences, min_species = min_species,
-      results, type = "cumulative"
+      results, type = "proportion"
     )
   )
 }

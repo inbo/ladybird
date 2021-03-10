@@ -70,7 +70,7 @@ base_model <- function(
   return(
     c(
       species = species, min_occurrences = min_occurrences,
-      min_species = min_species, results
+      min_species = min_species, results, type = "base"
     )
   )
 }

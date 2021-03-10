@@ -6,11 +6,12 @@
 species}
 \usage{
 cumulative_model(
-  species = "Adal_dece",
+  species = "Adal_bipu",
   min_occurrences = 1000,
   min_species = 3,
   secondary,
-  first_order = TRUE
+  first_order = TRUE,
+  center_year = 2001
 )
 }
 \arguments{
@@ -26,6 +27,9 @@ of location and year.}
 \item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
 for the year component.
 Defaults to \code{TRUE}.}
+
+\item{center_year}{The year to center to.
+Defaults to \code{2001}.}
 }
 \description{
 Fit a model to a species using the cumulative predictions for a secundary

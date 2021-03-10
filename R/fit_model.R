@@ -42,7 +42,13 @@ fit_model <- function(
     A = list(a_estimate, 1),
     effects = list(
       c(site_index, list(intercept = 1)),
-      list(select(base_data, .data$cyear, .data$iyear, .data$secondary))
+      list(
+        base_data %>%
+          select(
+            .data$before, .data$after, .data$iyear, .data$iyear2,
+            .data$secondary
+          )
+      )
     ),
     tag = "estimate"
   ) -> stack_estimate
@@ -63,23 +69,56 @@ fit_model <- function(
     A = list(a_prediction, 1),
     effects = list(
       c(site_index, list(intercept = 1)),
-      list(select(base_prediction, .data$cyear, .data$iyear, .data$secondary))
+      list(
+        base_prediction %>%
+          select(
+            .data$before, , .data$after, .data$iyear, .data$iyear2,
+            .data$secondary
+          )
+      )
     ),
     tag = "prediction"
   ) -> stack_prediction
   inla.stack(stack_estimate, stack_trend) -> stack
   inla.stack(stack_estimate, stack_prediction) -> stack2
-  fixed_formula <- "occurrence ~ 0 + intercept + cyear"
+  is_secondary <- any(!is.na(base_data$secondary))
+  fixed_formula <- ifelse(
+    is_secondary,
+    "occurrence ~ 0 + intercept + before + after",
+    "occurrence ~ 0 + intercept + cyear"
+  )
   rw_formula <- ifelse(
     first_order,
-    "f(
-      iyear, model = \"rw1\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.05)))
-    ) +",
-    "f(
-      iyear, model = \"rw2\",
-      hyper = list(theta = list(prior = \"pc.prec\", param = c(0.02, 0.05)))
-    )"
+    ifelse(
+      is_secondary,
+      "f(
+        iyear, model = \"rw1\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.05)))
+      ) +
+      f(
+        iyear2, secondary, copy = \"iyear\",
+      hyper = list(beta = list(fixed = FALSE))
+      )",
+      "f(
+        iyear, model = \"rw1\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.1, 0.05)))
+      )"
+    ),
+    ifelse(
+      is_secondary,
+      "f(
+        iyear, model = \"rw2\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.02, 0.05)))
+      ) +
+      f(
+        iyear2, secondary, copy = \"iyear\",
+        hyper = list(beta = list(fixed = FALSE))
+      )",
+      "f(
+        iyear, model = \"rw2\",
+        hyper = list(theta = list(prior = \"pc.prec\", param = c(0.02, 0.05)))
+      )"
+    )
   )
   st_formula <- "f(
       site, model = spde, group = site.group,
