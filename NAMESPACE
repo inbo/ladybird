@@ -2,6 +2,7 @@
 
 export(base_model)
 export(cumulative_model)
+export(fit_model)
 export(import_data)
 export(load_relevant)
 export(occurrence_map)
