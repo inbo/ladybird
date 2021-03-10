@@ -39,6 +39,15 @@ map(base_models, "trend") %>%
   map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
   mutate(model = "base") -> trend
+map(base_models, "roc") %>%
+  map("ci") %>%
+  map(
+    ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
+  ) %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() %>%
+  mutate(model = "base") -> auc
 ```
 
 ```{r load-secondary-models}
@@ -66,8 +75,16 @@ map(secondary_models, "trend") %>%
   map2(sec_rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
   mutate(model = "occurrence") -> sec_trend
+map(secondary_models, "roc") %>%
+  map("ci") %>%
+  map(
+    ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
+  ) %>%
+  map2(sec_species, ~mutate(.x, species = .y)) %>%
+  map2(sec_rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() %>%
+  mutate(model = "occurrence") -> sec_auc
 ```
-
 
 ```{r load-cumulative-models}
 dirname(params$models) %>%
@@ -94,7 +111,17 @@ map(cumulative_models, "trend") %>%
   map2(cum_rw_order, ~mutate(.x, rw_order = .y)) %>%
   bind_rows() %>%
   mutate(model = "cumulative") -> cum_trend
+map(cumulative_models, "roc") %>%
+  map("ci") %>%
+  map(
+    ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
+  ) %>%
+  map2(cum_species, ~mutate(.x, species = .y)) %>%
+  map2(cum_rw_order, ~mutate(.x, rw_order = .y)) %>%
+  bind_rows() %>%
+  mutate(model = "cumulative") -> cum_auc
 ```
+
 ```{r combined}
 trend %>%
   mutate(type = "") %>%
@@ -102,6 +129,8 @@ trend %>%
   mutate(prediction = interaction(model, type, sep = " ")) -> all_trend
 hyperpar %>%
   bind_rows(sec_hyperpar, cum_hyperpar) -> all_hyperpar
+auc %>%
+  bind_rows(sec_auc, cum_auc) -> all_auc
 ```
 
 # Compare models
@@ -138,6 +167,25 @@ data.frame(species, waic, rw_order = rw_order, model = "base") %>%
   )
 ```
 
+
+```{r auc}
+all_auc %>%
+  pivot_wider(names_from = parameter, values_from = auc) %>%
+  mutate(
+    species = reorder(species, estimate),
+    order = factor(rw_order)
+  ) %>%
+  ggplot(
+    aes(
+      x = estimate, xmin = lcl, xmax = ucl, y = species, colour = model,
+      linetype = order, shape = order
+    )
+  ) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme(axis.title = element_blank()) +
+  ggtitle("AUC")
+```
 
 # Interactions with _H. axyridis_
 
@@ -200,6 +248,7 @@ plot_trend <- function(this_species) {
 }
 plot_trend("Adal_bipu")
 ```
+
 ```{r trends-adal-dece}
 plot_trend("Adal_dece")
 ```
