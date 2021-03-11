@@ -1,11 +1,11 @@
-#' Fit a model to a species using the predictions for a secundary species
+#' Fit a model to a species using the predictions for a secondary species
 #' @inheritParams base_model
 #' @param base_data A dataframe with the base data.
 #' @param trend_prediction A dataframe with the timestamps to predict the trend.
 #' @param base_prediction A dataframe with the locations and timestamps to
 #' predict.
 #' @export
-#' @importFrom assertthat assert_that is.flag noNA
+#' @importFrom assertthat assert_that has_name is.flag noNA
 #' @importFrom dplyr as_tibble bind_cols distinct select %>%
 #' @importFrom INLA inla inla.mesh.1d inla.mesh.2d inla.spde2.pcmatern
 #' inla.spde.make.A inla.spde.make.index inla.stack inla.stack.A inla.stack.data
@@ -17,6 +17,38 @@ fit_model <- function(
   first_order = TRUE, base_data, trend_prediction, base_prediction
 ) {
   assert_that(is.flag(first_order), noNA(first_order))
+  assert_that(inherits(base_data, "data.frame"))
+  assert_that(inherits(trend_prediction, "data.frame"))
+  assert_that(inherits(base_prediction, "data.frame"))
+  assert_that(
+    has_name(base_data, "iyear"), has_name(base_data, "iyear2"),
+    has_name(base_data, "X"), has_name(base_data, "Y"),
+    has_name(base_data, "secondary")
+  )
+  assert_that(
+    has_name(trend_prediction, "iyear"), has_name(trend_prediction, "iyear2"),
+    has_name(base_prediction, "secondary")
+  )
+  assert_that(
+    has_name(base_prediction, "iyear"), has_name(base_prediction, "iyear2"),
+    has_name(base_prediction, "X"), has_name(base_prediction, "Y"),
+    has_name(base_prediction, "secondary")
+  )
+  is_secondary <- any(!is.na(base_data$secondary))
+  if (is_secondary) {
+    time_vars <- c("before", "after")
+    assert_that(
+      has_name(base_data, "before"), has_name(base_data, "after"),
+      has_name(trend_prediction, "before"), has_name(trend_prediction, "after"),
+      has_name(base_prediction, "before"), has_name(base_prediction, "after")
+    )
+  } else {
+    time_vars <- "cyear"
+    assert_that(
+      has_name(base_data, "cyear"), has_name(trend_prediction, "cyear"),
+      has_name(base_prediction, "cyear")
+    )
+  }
   n_year <- max(base_data$iyear)
   year_interval <- 5
   seq(year_interval / 2, n_year, by = year_interval) %>%
@@ -44,10 +76,7 @@ fit_model <- function(
       c(site_index, list(intercept = 1)),
       list(
         base_data %>%
-          select(
-            .data$before, .data$after, .data$iyear, .data$iyear2,
-            .data$secondary
-          )
+          select(!!time_vars, .data$iyear, .data$iyear2, .data$secondary)
       )
     ),
     tag = "estimate"
@@ -71,17 +100,13 @@ fit_model <- function(
       c(site_index, list(intercept = 1)),
       list(
         base_prediction %>%
-          select(
-            .data$before, , .data$after, .data$iyear, .data$iyear2,
-            .data$secondary
-          )
+          select(!!time_vars, .data$iyear, .data$iyear2, .data$secondary )
       )
     ),
     tag = "prediction"
   ) -> stack_prediction
   inla.stack(stack_estimate, stack_trend) -> stack
   inla.stack(stack_estimate, stack_prediction) -> stack2
-  is_secondary <- any(!is.na(base_data$secondary))
   fixed_formula <- ifelse(
     is_secondary,
     "occurrence ~ 0 + intercept + before + after",

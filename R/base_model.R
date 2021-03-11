@@ -37,15 +37,19 @@ base_model <- function(
       .data$year, .data$location, .data$X, .data$Y, occurrence = !!species
     ) %>%
     mutate(
-      X = .data$X / 1e3, Y = .data$Y / 1e3,
       iyear = .data$year - min(.data$year) + 1,
+      iyear2 = .data$iyear,
       cyear = .data$year - center_year,
-      secondary = NA
+      X = .data$X / 1e3, Y = .data$Y / 1e3,
+      secondary = NA_real_
     ) -> base_data
   base_data %>%
-    distinct(.data$year, .data$cyear, .data$iyear) %>%
+    distinct(.data$year) %>%
     arrange(.data$year) %>%
     mutate(
+      iyear = .data$year - min(.data$year) + 1,
+      iyear2 = .data$iyear,
+      cyear = .data$year - center_year,
       intercept = 1,
       secondary = NA_real_
     ) -> trend_prediction
@@ -59,6 +63,7 @@ base_model <- function(
     ) %>%
     mutate(
       iyear = .data$year - min(.data$year) + 1,
+      iyear2 = .data$iyear,
       cyear = .data$year - center_year,
       secondary = NA
     ) %>%

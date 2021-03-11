@@ -2,7 +2,7 @@
 % Please edit documentation in R/fit_model.R
 \name{fit_model}
 \alias{fit_model}
-\title{Fit a model to a species using the predictions for a secundary species}
+\title{Fit a model to a species using the predictions for a secondary species}
 \usage{
 fit_model(first_order = TRUE, base_data, trend_prediction, base_prediction)
 }
@@ -19,5 +19,5 @@ Defaults to \code{TRUE}.}
 predict.}
 }
 \description{
-Fit a model to a species using the predictions for a secundary species
+Fit a model to a species using the predictions for a secondary species
 }
