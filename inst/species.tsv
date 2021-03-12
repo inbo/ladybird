@@ -1,36 +1,38 @@
-taxon_key	scientific_name
-1	Hippodamia tredecimpunctata
-2	Hippodamia variegata
-3	Adalia bipunctata
-4	Harmonia quadripunctata
-5	Calvia quatuordecimguttata
-6	Subcoccinella vigintiquatuorpunctata
-7	Aphidecta obliterata
-8	Chilocorus bipustulatus
-9	Coccinula quatuordecimpustulata
-10	Propylea quatuordecimpunctata
-11	Anisosticta novemdecimpunctata
-12	Adalia decempunctata
-13	Calvia decemguttata
-14	Myrrha octodecimguttata
-15	Psyllobora vigintiduopunctata
-16	Halyzia sedecimguttata
-17	Vibidia duodecimguttata
-18	Tytthaspis sedecimpunctata
-19	Cynegetis impunctata
-20	Henosepilachna argus
-21	Chilocorus renipustulatus
-22	Exochomus nigromaculatus
-23	Platynaspis luteorubra
-24	Harmonia axyridis
-25	Coccinella hieroglyphica
-26	Coccinella septempunctata
-27	Coccinella undecimpunctata
-28	Anatis ocellata
-29	Myzia oblongoguttata
-30	Hippodamia septemmaculata
-31	Coccinella quinquepunctata
-32	Coccinella magnifica
-33	Oenopia conglobata
-34	Exochomus quadripustulatus
-35	Oenopia impustulata
+taxon_key	scientific_name	code
+1	Hippodamia tredecimpunctata	Hipp_tred
+2	Hippodamia variegata	Hipp_vari
+3	Adalia bipunctata	Adal_bipu
+4	Harmonia quadripunctata	Harm_quad
+5	Calvia quatuordecimguttata	Calv_quat
+6	Subcoccinella vigintiquatuorpunctata	Subc_vigi
+7	Aphidecta obliterata	Aphi_obli
+8	Chilocorus bipustulatus	Chil_bipu
+9	Coccinula quatuordecimpustulata	Cocc_quat
+10	Propylea quatuordecimpunctata	Prop_quat
+11	Anisosticta novemdecimpunctata	Anis_nove
+12	Adalia decempunctata	Adal_dece
+13	Calvia decemguttata	Calv_dece
+14	Myrrha octodecimguttata	Myrr_octo
+15	Psyllobora vigintiduopunctata	Psyl_vigi
+16	Halyzia sedecimguttata	Haly_sede
+17	Vibidia duodecimguttata	Vibi_duod
+18	Tytthaspis sedecimpunctata	Tytt_sede
+19	Cynegetis impunctata	Cyne_impu
+20	Henosepilachna argus	Heno_argu
+21	Chilocorus renipustulatus	Chil_reni
+22	Exochomus nigromaculatus	Exoc_nigr
+23	Platynaspis luteorubra	Plat_lute
+24	Harmonia axyridis	Harm_axyr
+25	Coccinella hieroglyphica	Cocc_hier
+26	Coccinella septempunctata	Cocc_sept
+27	Coccinella undecimpunctata	Cocc_unde
+36	Sospita vigintiguttata	Sosp_vigi
+28	Anatis ocellata	Anat_ocel
+29	Myzia oblongoguttata	Myzi_oblo
+30	Hippodamia septemmaculata	Hipp_sept
+31	Coccinella quinquepunctata	Cocc_quin
+32	Coccinella magnifica	Cocc_magn
+33	Oenopia conglobata	Oeno_cong
+34	Exochomus quadripustulatus	Exoc_quad
+35	Oenopia impustulata	Oeno_impu
+37	Coccinella miranda	Cocc_mira

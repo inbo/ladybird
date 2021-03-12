@@ -1,13 +1,23 @@
 Type: Package
 Package: ladybird
 Title: Analysis of Ladybird Occurrence Data
-Version: 0.0.1
+Version: 0.0.2
 Authors@R:
     c(person(given = "Thierry",
              family = "Onkelinx",
              role = c("aut", "cre"),
              email = "thierry.onkelinx@inbo.be",
              comment = c(ORCID = "0000-0001-8804-4216")),
+      person(given = "Tim",
+             family = "Adriaens",
+             role = "aut",
+             email = "tim.adriaens@inbo.be",
+             comment = c(ORCID = "0000-0001-7268-4200")),
+      person(given = "Dirk",
+             family = "Maes",
+             role = "aut",
+             email = "dirk.maes@inbo.be",
+             comment = c(ORCID = "0000-0002-7947-3788")),
       person(given = "Research Institute for Nature and Forest",
              role = c("cph", "fnd"),
              email = "info@inbo.be"))
@@ -17,10 +27,12 @@ License: GPL-3
 URL: https://inbo.github.io/ladybird
 BugReports: https://github.com/inbo/ladybird/issues
 Imports: 
+    INLA,
     assertthat,
     dplyr,
     git2rdata,
     leaflet,
+    pROC,
     readr,
     rlang,
     sf,
@@ -28,9 +40,12 @@ Imports:
     tidyr
 Suggests:
     INBOtheme,
-    plotly
+    here,
+    plotly,
+    scales
 Remotes:
     inbo/inbotheme
+Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
