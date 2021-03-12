@@ -100,7 +100,7 @@ fit_model <- function(
       c(site_index, list(intercept = 1)),
       list(
         base_prediction %>%
-          select(!!time_vars, .data$iyear, .data$iyear2, .data$secondary )
+          select(!!time_vars, .data$iyear, .data$iyear2, .data$secondary)
       )
     ),
     tag = "prediction"
