@@ -3,25 +3,15 @@ package: yes
 allowed:
   warnings:
   - motivation: Package not intended for CRAN.
-    value: |-
-      checking CRAN incoming feasibility ... WARNING
-      Maintainer: ‘Thierry Onkelinx <thierry.onkelinx@inbo.be>’
-
-      New submission
-
-      Unknown, possibly mis-spelled, fields in DESCRIPTION:
-        ‘Remotes’
-
-      Strong dependencies not in mainstream repositories:
-        INLA
-      Suggests or Enhances not in mainstream repositories:
-        INBOtheme
-
-      Found the following (possibly) invalid URLs:
-        URL: https://inbo.github.io/ladybird
-          From: DESCRIPTION
-          Status: 404
-          Message: Not Found
+    value: "checking CRAN incoming feasibility ... WARNING\nMaintainer: ‘Thierry Onkelinx
+      <thierry.onkelinx@inbo.be>’\n\nNew submission\n\nUnknown, possibly mis-spelled,
+      fields in DESCRIPTION:\n  ‘Remotes’\n\nStrong dependencies not in mainstream
+      repositories:\n  INLA\nSuggests or Enhances not in mainstream repositories:\n
+      \ INBOtheme\nAvailability using Additional_repositories specification:\n  INLA
+      \       yes   https://inla.r-inla-download.org/R/stable\n  INBOtheme    no   ?
+      \                                       \n\nFound the following (possibly) invalid
+      URLs:\n  URL: https://inbo.github.io/ladybird\n    From: DESCRIPTION\n    Status:
+      404\n    Message: Not Found"
   - motivation: Unit test are overkill for an analysis package.
     value: |-
       checking for code which exercises the package ... WARNING

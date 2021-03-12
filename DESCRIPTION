@@ -44,8 +44,8 @@ Suggests:
     plotly,
     scales
 Remotes:
-    inbo/INLA,
     inbo/inbotheme
+Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
