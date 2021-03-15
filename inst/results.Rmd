@@ -242,6 +242,29 @@ fixed %>%
   theme(axis.title = element_blank())
 ```
 
+```{r}
+p <- fixed %>%
+  filter(parameter != "intercept", rw_order == 1, model != "base") %>%
+  select(model, species, parameter, mean, lcl = `0.025quant`, ucl = `0.975quant`) %>%
+  pivot_longer(c(mean, lcl, ucl)) %>%
+  pivot_wider(names_from = c(parameter, name)) %>%
+  ggplot(
+    aes(
+      x = before_mean, xmin = before_lcl, xmax = before_ucl, y = after_mean, 
+      ymin = after_lcl, ymax = after_ucl, colour = model, label = species
+    )
+  ) +
+  geom_hline(yintercept = 0, linetype = 3) +
+  geom_vline(xintercept = 0, linetype = 3) +
+  geom_abline(linetype = 3) +
+  geom_errorbarh() +
+  geom_errorbar() +
+  geom_point() +
+  scale_x_continuous("trend before 2001") +
+  scale_y_continuous("trend after 2001")
+ggplotly(p, tooltip = "species")
+```
+
 ## General trends
 
 - **median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
