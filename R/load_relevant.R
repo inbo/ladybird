@@ -28,5 +28,9 @@ load_relevant <- function(min_occurrences = 1000, min_species = 3) {
     ) %>%
     pivot_wider(
       names_from = .data$species, values_from = .data$observed, values_fill = 0L
+    ) %>%
+    inner_join(
+      read_vc("visits", system.file(package = "ladybird")),
+      by = c("year", "location")
     )
 }
