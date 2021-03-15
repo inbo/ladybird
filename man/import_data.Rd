@@ -4,10 +4,13 @@
 \alias{import_data}
 \title{Import and standardise the raw data}
 \usage{
-import_data(belgium, output, strict = TRUE)
+import_data(belgium_occurrence, belgium_visits, output, strict = TRUE)
 }
 \arguments{
-\item{belgium}{path to the CSV file with the Belgian data.}
+\item{belgium_occurrence}{path to the CSV file with the Belgian occurrence
+data.}
+
+\item{belgium_visits}{path to the CSV file with the Belgian visit data.}
 
 \item{output}{path to the root of the data package}
 

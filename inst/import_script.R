@@ -1,1 +1,4 @@
-import_data(belgium = "../Data/datasetBelgium.csv", output = ".")
+import_data(
+  belgium_occurrence = "../Data/datasetBelgiumSeason.csv",
+  belgium_visits = "../Data/NDayVisits_datasetBelgium.csv", output = "."
+)
