@@ -7,6 +7,7 @@ taxon_key	scientific_name	code
 6	Subcoccinella vigintiquatuorpunctata	Subc_vigi
 7	Aphidecta obliterata	Aphi_obli
 8	Chilocorus bipustulatus	Chil_bipu
+38	Cryptolaemus montrouzieri	Cryp_mont
 9	Coccinula quatuordecimpustulata	Cocc_quat
 10	Propylea quatuordecimpunctata	Prop_quat
 11	Anisosticta novemdecimpunctata	Anis_nove
@@ -35,4 +36,3 @@ taxon_key	scientific_name	code
 33	Oenopia conglobata	Oeno_cong
 34	Exochomus quadripustulatus	Exoc_quad
 35	Oenopia impustulata	Oeno_impu
-37	Coccinella miranda	Cocc_mira
