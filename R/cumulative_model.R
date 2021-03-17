@@ -2,7 +2,7 @@
 #' species
 #' @inheritParams base_model
 #' @inheritParams load_relevant
-#' @param secondary The output of `base_model()` for a different species.
+#' @inheritParams probability_model
 #' @export
 #' @importFrom assertthat assert_that are_equal has_name is.flag is.string noNA
 #' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join mutate
@@ -18,14 +18,13 @@
 #' @importFrom stats median
 cumulative_model <- function(
   species = "Adal_bipu", min_occurrences = 1000, min_species = 3, secondary,
-  first_order = TRUE, center_year = 2001
+  knots = c(1990, 2000, 2010, 2020)
 ) {
   assert_that(is.string(species))
-  assert_that(is.flag(first_order), noNA(first_order))
   if (missing(secondary)) {
     secondary <- base_model(
       species = "Harm_axyr", min_occurrences = min_occurrences,
-      min_species = min_species, first_order = first_order
+      min_species = min_species, knots = knots
     )
   } else {
     assert_that(is.list(secondary))
@@ -35,23 +34,14 @@ cumulative_model <- function(
     assert_that(are_equal(min_occurrences, secondary$min_occurrences))
     assert_that(has_name(secondary, "min_species"))
     assert_that(are_equal(min_species, secondary$min_species))
-    assert_that(has_name(secondary, "first_order"))
-    assert_that(are_equal(first_order, secondary$first_order))
     assert_that(has_name(secondary, "predictions"))
   }
   read_vc("location", system.file(package = "ladybird")) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-    st_transform(crs = 31370) %>%
-    st_transform(crs = 31370) -> base_data
-  secondary$predictions %>%
-    select(.data$year, .data$location, secondary = .data$mean) %>%
-    arrange(.data$year) %>%
-    group_by(.data$location) %>%
-    mutate(secondary = cumsum(.data$secondary)) %>%
-    ungroup() -> sec_pred
-  base_data %>%
+    st_transform(crs = 31370) -> base_loc
+  base_loc %>%
     bind_cols(
-      st_coordinates(base_data) %>%
+      st_coordinates(base_loc) %>%
         as.data.frame()
     ) %>%
     st_drop_geometry() %>%
@@ -62,32 +52,47 @@ cumulative_model <- function(
       by = "location"
     ) %>%
     select(
-      .data$year, .data$location, .data$X, .data$Y, occurrence = !!species
+      .data$year, .data$location, .data$X, .data$Y, .data$visits,
+      occurrence = !!species
     ) %>%
-    inner_join(sec_pred, by = c("year", "location")) %>%
+    filter(.data$year >= min(.data$year[.data$occurrence == 1]) - 1) %>%
+    left_join(
+      secondary$predictions %>%
+        arrange(.data$year) %>%
+        group_by(.data$location) %>%
+        transmute(
+          .data$year, .data$location, secondary = cumsum(.data$mean)
+        ) %>%
+        ungroup(),
+      by = c("year", "location")
+    ) %>%
+    ladybird:::add_knots(knots = knots) %>%
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3,
       iyear = .data$year - min(.data$year) + 1,
-      iyear2 = .data$iyear,
-      before = pmin(.data$year - center_year, 0),
-      after = pmax(.data$year - center_year, 0)
+      secondary = replace_na(.data$secondary, 0),
+      visits = pmin(.data$visits, 30)
     ) -> base_data
+
   base_data %>%
     group_by(.data$year) %>%
     summarise(
       median = median(.data$secondary, na.rm = TRUE),
       min = min(.data$secondary, na.rm = TRUE),
-      max = max(.data$secondary, na.rm = TRUE), without = 0
+      max = max(.data$secondary, na.rm = TRUE),
+      everywhere = 1,
+      without = 0
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     mutate(
-      intercept = 1,
-      iyear = .data$year - min(.data$year) + 1,
-      iyear2 = .data$iyear,
-      before = pmin(.data$year - center_year, 0),
-      after = pmax(.data$year - center_year, 0)
+      visits = 1
     ) %>%
-    arrange(.data$year, .data$type) -> trend_prediction
+    arrange(.data$year, .data$type) %>%
+    add_knots(knots = knots) -> trend_prediction_base
+  trend_prediction_base %>%
+    mutate(iyear = .data$year - min(.data$year) + 1) %>%
+    bind_rows(trend_prediction_base) -> trend_prediction
+
   base_data %>%
     distinct(.data$location, .data$year) %>%
     complete(.data$location, .data$year) %>%
@@ -96,18 +101,29 @@ cumulative_model <- function(
         distinct(.data$location, .data$X, .data$Y),
       by = "location"
     ) %>%
-    inner_join(sec_pred, by = c("location", "year")) %>%
+    add_knots(knots = knots) %>%
+    inner_join(
+      secondary$predictions %>%
+        select(.data$year, .data$location, secondary = .data$mean),
+      by = c("year", "location")
+    ) %>%
     mutate(
-      iyear = .data$year - min(.data$year) + 1,
-      iyear2 = .data$iyear,
-      before = pmin(.data$year - center_year, 0),
-      after = pmax(.data$year - center_year, 0)
+      iyear = .data$year - min(.data$year) + 1, visits = 1
     ) %>%
     arrange(.data$location, .data$year) -> base_prediction
+
+  expand.grid(
+    X = pretty(base_data$X, 20),
+    Y = pretty(base_data$Y, 20),
+    year = knots,
+    visits = 1
+  ) -> field_prediction
+
   results <- fit_model(
-    first_order = first_order, base_data = base_data,
-    trend_prediction = trend_prediction, base_prediction = base_prediction
+    base_data = base_data, trend_prediction = trend_prediction, knots = knots,
+    base_prediction = base_prediction, field_prediction = field_prediction
   )
+
   return(
     c(
       species = species, secondary = secondary$species,

@@ -8,8 +8,7 @@ base_model(
   species = "Harm_axyr",
   min_occurrences = 1000,
   min_species = 3,
-  first_order = TRUE,
-  center_year = 2001
+  knots = c(1990, 2000, 2010, 2020)
 )
 }
 \arguments{
@@ -20,12 +19,7 @@ base_model(
 \item{min_species}{The minimum number of species recorded at the combination
 of location and year.}
 
-\item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
-for the year component.
-Defaults to \code{TRUE}.}
-
-\item{center_year}{The year to center to.
-Defaults to \code{2001}.}
+\item{knots}{Which years to use a knots for the piecewise linear regression.}
 }
 \description{
 Fit a base model to a species

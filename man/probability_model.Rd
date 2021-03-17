@@ -5,12 +5,11 @@
 \title{Fit a model to a species using the predictions for a secondary species}
 \usage{
 probability_model(
-  species = "Adal_dece",
+  species = "Adal_bipu",
   min_occurrences = 1000,
   min_species = 3,
   secondary,
-  first_order = TRUE,
-  center_year = 2001
+  knots = c(1990, 2000, 2010, 2020)
 )
 }
 \arguments{
@@ -23,12 +22,7 @@ of location and year.}
 
 \item{secondary}{The output of \code{base_model()} for a different species.}
 
-\item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
-for the year component.
-Defaults to \code{TRUE}.}
-
-\item{center_year}{The year to center to.
-Defaults to \code{2001}.}
+\item{knots}{Which years to use a knots for the piecewise linear regression.}
 }
 \description{
 Fit a model to a species using the predictions for a secondary species

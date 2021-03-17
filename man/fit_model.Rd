@@ -4,19 +4,26 @@
 \alias{fit_model}
 \title{Fit a model to a species using the predictions for a secondary species}
 \usage{
-fit_model(first_order = TRUE, base_data, trend_prediction, base_prediction)
+fit_model(
+  base_data,
+  trend_prediction,
+  base_prediction,
+  field_prediction,
+  knots
+)
 }
 \arguments{
-\item{first_order}{Use first (\code{TRUE}) or second (\code{FALSE}) order random walk
-for the year component.
-Defaults to \code{TRUE}.}
-
 \item{base_data}{A dataframe with the base data.}
 
 \item{trend_prediction}{A dataframe with the timestamps to predict the trend.}
 
 \item{base_prediction}{A dataframe with the locations and timestamps to
 predict.}
+
+\item{field_prediction}{A dataframe with locations and timestamps to predict
+the spatiotemporal field.}
+
+\item{knots}{Which years to use a knots for the piecewise linear regression.}
 }
 \description{
 Fit a model to a species using the predictions for a secondary species

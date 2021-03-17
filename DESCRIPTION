@@ -37,6 +37,7 @@ Imports:
     rlang,
     sf,
     shiny,
+    tibble,
     tidyr
 Suggests:
     INBOtheme,
