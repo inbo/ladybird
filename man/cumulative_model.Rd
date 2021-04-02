@@ -10,7 +10,8 @@ cumulative_model(
   min_occurrences = 1000,
   min_species = 3,
   secondary,
-  knots = c(1990, 2000, 2010, 2020)
+  knots = c(1990, 2000, 2010, 2020),
+  country = c("BE", "NL")
 )
 }
 \arguments{
@@ -24,6 +25,8 @@ of location and year.}
 \item{secondary}{The output of \code{base_model()} for a different species.}
 
 \item{knots}{Which years to use a knots for the piecewise linear regression.}
+
+\item{country}{Data from which country to select.}
 }
 \description{
 Fit a model to a species using the cumulative predictions for a secundary

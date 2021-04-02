@@ -1,5 +1,6 @@
 #' Fit a base model to a species
 #' @param species Name of the species.
+#' @param country Data from which country to select.
 #' @inheritParams load_relevant
 #' @param knots Which years to use a knots for the piecewise linear regression.
 #' @export
@@ -14,11 +15,14 @@
 #' @importFrom utils head
 base_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
-  knots = c(1990, 2000, 2010, 2020)
+  knots = c(1990, 2000, 2010, 2020), country = c("BE", "NL")
 ) {
+  which_country <- match.arg(country)
+  crs <- c(BE = 31370, NL = 28992)
   read_vc("location", system.file(package = "ladybird")) %>%
+    filter(.data$country == which_country) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-    st_transform(crs = 31370) -> base_loc
+    st_transform(crs = crs[which_country]) -> base_loc
   base_loc %>%
     bind_cols(
       st_coordinates(base_loc) %>%
@@ -83,7 +87,7 @@ base_model <- function(
   return(
     c(
       species = species, min_occurrences = min_occurrences,
-      min_species = min_species, results, type = "base"
+      min_species = min_species, results, type = "base", country = which_country
     )
   )
 }

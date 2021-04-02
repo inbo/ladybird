@@ -14,8 +14,10 @@
 #' @importFrom stats median
 cumulative_model <- function(
   species = "Adal_bipu", min_occurrences = 1000, min_species = 3, secondary,
-  knots = c(1990, 2000, 2010, 2020)
+  knots = c(1990, 2000, 2010, 2020), country = c("BE", "NL")
 ) {
+  which_country <- match.arg(country)
+  crs <- c(BE = 31370, NL = 28992)
   assert_that(is.string(species))
   if (missing(secondary)) {
     secondary <- base_model(
@@ -31,10 +33,13 @@ cumulative_model <- function(
     assert_that(has_name(secondary, "min_species"))
     assert_that(are_equal(min_species, secondary$min_species))
     assert_that(has_name(secondary, "predictions"))
+    assert_that(has_name(secondary, "country"))
+    assert_that(are_equal(which_country, secondary$country))
   }
   read_vc("location", system.file(package = "ladybird")) %>%
+    filter(.data$country == which_country) %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-    st_transform(crs = 31370) -> base_loc
+    st_transform(crs = crs[which_country]) -> base_loc
   base_loc %>%
     bind_cols(
       st_coordinates(base_loc) %>%
@@ -146,7 +151,7 @@ cumulative_model <- function(
     c(
       species = species, secondary = secondary$species,
       min_occurrences = min_occurrences, min_species = min_species,
-      results, type = "cumulative"
+      results, type = "cumulative", country = which_country
     )
   )
 }

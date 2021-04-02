@@ -8,7 +8,8 @@ base_model(
   species = "Harm_axyr",
   min_occurrences = 1000,
   min_species = 3,
-  knots = c(1990, 2000, 2010, 2020)
+  knots = c(1990, 2000, 2010, 2020),
+  country = c("BE", "NL")
 )
 }
 \arguments{
@@ -20,6 +21,8 @@ base_model(
 of location and year.}
 
 \item{knots}{Which years to use a knots for the piecewise linear regression.}
+
+\item{country}{Data from which country to select.}
 }
 \description{
 Fit a base model to a species

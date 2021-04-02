@@ -9,69 +9,82 @@ ds <- load_relevant(
 )
 available_species <- head(tail(colnames(ds), -2), -1)
 
-for (species in available_species) {
-  output <- sprintf(
-    "%s/%s_%i_%i.rds", output_dir, tolower(species), min_occurrences,
-    min_species
-  )
-  if (file.exists(output)) {
-    next
-  }
-  message("base: ", species, " ", Sys.time())
-  bm <- try(base_model(
-    species = species, min_occurrences = min_occurrences,
-    min_species = min_species, knots = c(1990, 2000, 2010, 2020)
-  ))
-  if (!inherits(bm, "try-error")) {
-    saveRDS(bm, output)
+for (country in c("BE", "NL")) {
+  for (species in available_species) {
+    output <- sprintf(
+      "%s/%s_%s_%i_%i.rds", output_dir, tolower(species), tolower(country),
+      min_occurrences, min_species
+    )
+    if (file.exists(output)) {
+      next
+    }
+    message("base: ", country, " ", species, " ", Sys.time())
+    bm <- try(base_model(
+      species = species, min_occurrences = min_occurrences, country = country,
+      min_species = min_species, knots = c(1990, 2000, 2010, 2020)
+    ))
+    if (!inherits(bm, "try-error")) {
+      saveRDS(bm, output)
+    }
   }
 }
-secondary <- readRDS(
-  sprintf(
-    "%s/%s_%i_%i.rds", output_dir, "harm_axyr", min_occurrences, min_species
-  )
-)
 
 dir.create(file.path(output_dir, "..", "probability"), showWarnings = FALSE)
-for (species in available_species) {
-  if (species == "Harm_axyr") {
-    next
-  }
-  output <- sprintf(
-    "%s/%s_%i_%i.rds", file.path(output_dir, "..", "probability"),
-    tolower(species), min_occurrences, min_species
+for (country in c("BE", "NL")) {
+  secondary <- readRDS(
+    sprintf(
+      "%s/%s_%s_%i_%i.rds", output_dir, "harm_axyr", tolower(country),
+      min_occurrences, min_species
+    )
   )
-  if (file.exists(output)) {
-    next
-  }
-  message("probability: ", species, " ", Sys.time())
-  sm <- try(probability_model(
-    species = species, min_occurrences = min_occurrences,
-    min_species = min_species, secondary = secondary,
-    knots = c(1990, 2000, 2010, 2020)
-  ))
-  if (!inherits(sm, "try-error")) {
-    saveRDS(sm, output)
+  for (species in available_species) {
+    if (species == "Harm_axyr") {
+      next
+    }
+    output <- sprintf(
+      "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "probability"),
+      tolower(species), tolower(country), min_occurrences, min_species
+    )
+    if (file.exists(output)) {
+      next
+    }
+    message("probability: ", country, " ", species, " ", Sys.time())
+    sm <- try(probability_model(
+      species = species, min_occurrences = min_occurrences,
+      min_species = min_species, secondary = secondary,
+      knots = c(1990, 2000, 2010, 2020), country = country
+    ))
+    if (!inherits(sm, "try-error")) {
+      saveRDS(sm, output)
+    }
   }
 }
 
 dir.create(file.path(output_dir, "..", "cumulative"), showWarnings = FALSE)
-for (species in available_species) {
-  if (species == "Harm_axyr") {
-    next
-  }
-  output <- sprintf(
-    "%s/%s_%i_%i.rds", file.path(output_dir, "..", "cumulative"),
-    tolower(species), min_occurrences, min_species
+for (country in c("BE", "NL")) {
+  secondary <- readRDS(
+    sprintf(
+      "%s/%s_%s_%i_%i.rds", output_dir, "harm_axyr", tolower(country),
+      min_occurrences, min_species
+    )
   )
-  if (file.exists(output)) {
-    next
+  for (species in available_species) {
+    if (species == "Harm_axyr") {
+      next
+    }
+    output <- sprintf(
+      "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "cumulative"),
+      tolower(species), tolower(country), min_occurrences, min_species
+    )
+    if (file.exists(output)) {
+      next
+    }
+    message("cumulative: ", country, " ", species, " ", Sys.time())
+    sm <- cumulative_model(
+      species = species, min_occurrences = min_occurrences,
+      min_species = min_species, secondary = secondary,
+      knots = c(1990, 2000, 2010, 2020), country = country
+    )
+    saveRDS(sm, output)
   }
-  message("cumulative: ", species, " ", Sys.time())
-  sm <- cumulative_model(
-    species = species, min_occurrences = min_occurrences,
-    min_species = min_species, secondary = secondary,
-    knots = c(1990, 2000, 2010, 2020)
-  )
-  saveRDS(sm, output)
 }
