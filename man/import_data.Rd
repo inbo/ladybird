@@ -18,6 +18,11 @@ data.}
 overwrites the data and the metadata with a warning listing the changes,
 \code{strict = TRUE} returns an error and leaves the data and metadata as is.
 Defaults to \code{TRUE}.}
+
+\item{netherlands_occurrence}{path to the CSV file with the Dutch occurrence
+data.}
+
+\item{netherlands_visits}{path to the CSV file with the Dutch visit data.}
 }
 \description{
 Import and standardise the raw data

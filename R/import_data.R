@@ -2,6 +2,9 @@
 #' @param belgium_occurrence path to the CSV file with the Belgian occurrence
 #' data.
 #' @param belgium_visits path to the CSV file with the Belgian visit data.
+#' @param netherlands_occurrence path to the CSV file with the Dutch occurrence
+#' data.
+#' @param netherlands_visits path to the CSV file with the Dutch visit data.
 #' @param output path to the root of the data package
 #' @inheritParams git2rdata::write_vc
 #' @export
@@ -16,6 +19,7 @@ import_data <- function(
   belgium_occurrence, belgium_visits, output, strict = TRUE
 ) {
   assert_that(is.string(belgium_occurrence), is.string(belgium_visits))
+  assert_that(is.string(netherlands_occurrence), is.string(netherlands_visits))
   root <- repository(output)
   raw_belgium <- read_delim(belgium_occurrence, delim = ";", locale = locale())
   assert_that(
@@ -39,6 +43,30 @@ import_data <- function(
     msg = "Some Belgian occurrence data have no matching number of visits."
   )
 
+  raw_netherlands <- read_delim(
+    netherlands_occurrence, delim = ";", locale = locale()
+  )
+  assert_that(
+    all(
+      has_name(
+        raw_netherlands,
+        c("taxonKey", "scientific_name", "year", "utm1km", "centroid_x",
+          "centroid_y")
+      )
+    )
+  )
+  raw_nl_visit <- read_delim(netherlands_visits, delim = ";", locale = locale())
+  assert_that(all(has_name(raw_nl_visit, c("year", "utm1km", "nDayVisits"))))
+  raw_netherlands %>%
+    filter(.data$year >= 1991) %>%
+    distinct(.data$year, .data$utm1km) %>%
+    anti_join(raw_nl_visit, by = c("year", "utm1km")) %>%
+    nrow() -> missing_visits
+  assert_that(
+    missing_visits == 0,
+    msg = "Some Dutch occurrence data have no matching number of visits."
+  )
+
   st_as_sf(
     raw_belgium, coords = c("centroid_x", "centroid_y"), crs = 31370
   ) %>%
@@ -51,13 +79,27 @@ import_data <- function(
       country = factor("BE", levels = c("BE", "NL", "GB")),
       location = .data$utm1km, long = .data$X, lat = .data$Y
     ) -> raw_belgium
+  st_as_sf(
+    raw_netherlands, coords = c("centroid_x", "centroid_y"), crs = 28992
+  ) %>%
+    st_transform(crs = 4326) %>%
+    st_coordinates() %>%
+    as.data.frame() %>%
+    bind_cols(raw_netherlands) %>%
+    transmute(
+      taxon_key = .data$taxonKey, .data$scientific_name, .data$year,
+      country = factor("NL", levels = c("BE", "NL", "GB")),
+      location = .data$utm1km, long = .data$X, lat = .data$Y
+    ) -> raw_netherlands
   raw_belgium %>%
+    bind_rows(raw_netherlands) %>%
     filter(.data$year >= 1991) %>%
     mutate(
       location = factor(.data$location),
       taxon_key = factor(.data$taxon_key)
     ) -> raw_data
   raw_bel_visit %>%
+    bind_rows(raw_nl_visit) %>%
     transmute(
       .data$year,
       location = factor(.data$utm1km, levels = levels(raw_data$location)),
@@ -69,6 +111,13 @@ import_data <- function(
       strict = strict
     )
   raw_data %>%
+    mutate(
+      scientific_name = ifelse(
+        .data$scientific_name == "Harmonia axyridisHarmonia axyridis",
+        "Harmonia axyridis",
+        .data$scientific_name
+      )
+    ) %>%
     distinct(.data$taxon_key, .data$scientific_name) %>%
     mutate(
       code = gsub("^(.{4}).* (.{4}).*$", "\\1_\\2", .data$scientific_name)
