@@ -4,8 +4,8 @@
 #' @param secondary The output of `base_model()` for a different species.
 #' @export
 #' @importFrom assertthat assert_that are_equal has_name is.flag is.string noNA
-#' @importFrom dplyr arrange as_tibble bind_cols distinct inner_join left_join
-#' mutate rename_with select summarise %>%
+#' @importFrom dplyr across all_of arrange as_tibble bind_cols distinct
+#' inner_join left_join mutate rename_with select starts_with summarise %>%
 #' @importFrom git2rdata read_vc
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
@@ -56,13 +56,24 @@ probability_model <- function(
         select(.data$year, .data$location, secondary = .data$mean),
       by = c("year", "location")
     ) %>%
-    ladybird:::add_knots(knots = knots) %>%
+    add_knots(knots = knots) %>%
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3,
       iyear = .data$year - min(.data$year) + 1,
       secondary = replace_na(.data$secondary, 0),
-      visits = pmin(.data$visits, 30)
+      log_visits = log(.data$visits)
+    ) %>%
+    mutate(
+      across(
+        starts_with("knot"), list(secondary = ~ `*`(.x, .data$secondary))
+      )
     ) -> base_data
+  base_data %>%
+    select(starts_with("knot")) %>%
+    select_if(~max(.x) == 0) %>%
+    colnames() -> drop_knot
+  base_data %>%
+    select(-all_of(drop_knot)) -> base_data
 
   base_data %>%
     group_by(.data$year) %>%
@@ -74,11 +85,14 @@ probability_model <- function(
       without = 0
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
-    mutate(
-      visits = 1
-    ) %>%
     arrange(.data$year, .data$type) %>%
-    add_knots(knots = knots) -> trend_prediction_base
+    add_knots(knots = knots) %>%
+    mutate(
+      across(
+        starts_with("knot"), list(secondary = ~ `*`(.x, .data$secondary))
+      )
+    ) %>%
+    select(-all_of(drop_knot)) -> trend_prediction_base
   trend_prediction_base %>%
     mutate(iyear = .data$year - min(.data$year) + 1) %>%
     bind_rows(trend_prediction_base) -> trend_prediction
@@ -98,15 +112,20 @@ probability_model <- function(
       by = c("year", "location")
     ) %>%
     mutate(
-      iyear = .data$year - min(.data$year) + 1, visits = 1
+      across(
+        starts_with("knot"), list(secondary = ~ `*`(.x, .data$secondary))
+      )
+    ) %>%
+    select(-all_of(drop_knot)) %>%
+    mutate(
+      iyear = .data$year - min(.data$year) + 1
     ) %>%
     arrange(.data$location, .data$year) -> base_prediction
 
   expand.grid(
     X = pretty(base_data$X, 20),
     Y = pretty(base_data$Y, 20),
-    year = knots,
-    visits = 1
+    year = knots
   ) -> field_prediction
 
   results <- fit_model(

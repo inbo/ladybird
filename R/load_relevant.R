@@ -11,13 +11,19 @@ load_relevant <- function(min_occurrences = 1000, min_species = 3) {
   assert_that(is.count(min_occurrences), is.count(min_species))
   read_vc("occurrence", system.file(package = "ladybird")) %>%
     group_by(.data$taxon_key) %>%
-    filter(n() >= min_occurrences) %>%
+    filter(n() >= min_occurrences) -> relevant
+  relevant %>%
+    filter(.data$taxon_key != "4989904") %>%
     group_by(.data$location, .data$year) %>%
     filter(n() >= min_species) %>%
+    semi_join(x = relevant, by = c("location", "year")) %>%
     group_by(.data$taxon_key) %>%
-    filter(n() >= min_occurrences) %>%
+    filter(n() >= min_occurrences) -> relevant
+  relevant %>%
+    filter(.data$taxon_key != "4989904") %>%
     group_by(.data$location, .data$year) %>%
     filter(n() >= min_species) %>%
+    semi_join(x = relevant, by = c("location", "year")) %>%
     ungroup() %>%
     inner_join(
       read_vc("species", system.file(package = "ladybird")),

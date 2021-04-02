@@ -26,7 +26,7 @@ for (species in available_species) {
     saveRDS(bm, output)
   }
 }
-bm <- readRDS(
+secondary <- readRDS(
   sprintf(
     "%s/%s_%i_%i.rds", output_dir, "harm_axyr", min_occurrences, min_species
   )
@@ -47,7 +47,8 @@ for (species in available_species) {
   message("probability: ", species, " ", Sys.time())
   sm <- try(probability_model(
     species = species, min_occurrences = min_occurrences,
-    min_species = min_species, secondary = bm, knots = c(1990, 2000, 2010, 2020)
+    min_species = min_species, secondary = secondary,
+    knots = c(1990, 2000, 2010, 2020)
   ))
   if (!inherits(sm, "try-error")) {
     saveRDS(sm, output)
@@ -69,7 +70,8 @@ for (species in available_species) {
   message("cumulative: ", species, " ", Sys.time())
   sm <- cumulative_model(
     species = species, min_occurrences = min_occurrences,
-    min_species = min_species, secondary = bm, knots = c(1990, 2000, 2010, 2020)
+    min_species = min_species, secondary = secondary,
+    knots = c(1990, 2000, 2010, 2020)
   )
   saveRDS(sm, output)
 }

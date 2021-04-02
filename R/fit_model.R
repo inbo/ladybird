@@ -26,16 +26,14 @@ fit_model <- function(
   assert_that(
     has_name(base_data, "iyear"),
     has_name(base_data, "X"), has_name(base_data, "Y"),
-    has_name(base_data, "secondary"), has_name(base_data, "visits")
+    has_name(base_data, "secondary"), has_name(base_data, "log_visits")
   )
   assert_that(
-    has_name(trend_prediction, "iyear"), has_name(trend_prediction, "visits"),
-    has_name(trend_prediction, "secondary")
+    has_name(trend_prediction, "iyear"), has_name(trend_prediction, "secondary")
   )
   assert_that(
-    has_name(base_prediction, "iyear"), has_name(base_prediction, "visits"),
-    has_name(base_prediction, "X"), has_name(base_prediction, "Y"),
-    has_name(base_prediction, "secondary")
+    has_name(base_prediction, "iyear"), has_name(base_prediction, "secondary"),
+    has_name(base_prediction, "X"), has_name(base_prediction, "Y")
   )
   is_secondary <- any(!is.na(base_data$secondary))
 
@@ -66,10 +64,8 @@ fit_model <- function(
       list(
         base_data %>%
           select(
-            !!time_vars, .data$year, .data$iyear, .data$secondary
-          ) %>%
-          mutate(
-            secondary = round(.data$secondary, 2)
+            !!time_vars, .data$year, .data$iyear, .data$secondary,
+            .data$log_visits
           )
       )
     ),
@@ -79,8 +75,8 @@ fit_model <- function(
   fixed_formula <- sprintf(
     ifelse(
       is_secondary,
-      "occurrence ~ 0 + %1$s + (%1$s):secondary",
-      "occurrence ~ 0 + %s"
+      "occurrence ~ 0 + log_visits + %1$s + (%1$s):secondary",
+      "occurrence ~ 0 + log_visits + %s"
     ),
     paste(time_vars, collapse = " + ")
   )
@@ -103,11 +99,12 @@ fit_model <- function(
     before = head(time_vars, -1)
   ) %>%
     mutate(
-      decade = gsub(".*_", "", .data$before),
-      period = gsub("knot_", "", time_vars) %>%
+      decade = gsub("^knot_([0-9]{4}).*", "\\1", .data$before),
+      period = gsub("^knot_([0-9]{4}).*", "\\1", .data$after) %>%
         as.integer() %>%
-        diff()
+        `-`(as.integer(decade))
     ) %>%
+    filter(period > 0) %>%
     pivot_longer(c("after", "before")) %>%
     transmute(
       .data$decade, .data$value,
@@ -117,11 +114,35 @@ fit_model <- function(
     as.data.frame() -> lc_base
   if (is_secondary) {
     lc_base %>%
-      select(-.data$decade) %>%
-      rename_with(~ paste0(.x, ":secondary")) %>%
-      bind_cols(lc_base) %>%
-      mutate(decade = paste0(.data$decade, ":1")) %>%
-      bind_rows(lc_base) -> lc_base
+      mutate(
+        across(
+          ends_with("secondary"), function(x){
+            NA
+          }
+        )
+      ) %>%
+      bind_rows(
+        lc_base %>%
+          mutate(
+            across(
+              paste0("knot_", knots), function(x){
+                NA
+              }
+            ),
+            decade = paste0(.data$decade, ":0")
+          ),
+        lc_base %>%
+          mutate(decade = paste0(.data$decade, ":1"))
+      ) -> lc_base
+    lc_base %>%
+      select(-decade) %>%
+      is.na() %>%
+      apply(1, all) -> all_na
+    lc_base <- lc_base[!all_na, ]
+    lc_base %>%
+      select(-decade) %>%
+      anyDuplicated() -> duplicates
+    lc_base <- lc_base[-duplicates, ]
   }
   lc_base %>%
     select(-.data$decade) %>%
@@ -129,8 +150,8 @@ fit_model <- function(
     setNames(lc_base$decade) -> lc
 
   m0 <- inla(
-    model_formula, family = "cbinomial",
-    Ntrials = cbind(k = 1, n = base_data$visits),
+    model_formula, family = "binomial",
+    Ntrials = 1,
     data = inla.stack.data(stack_estimate),
     control.predictor = list(A = inla.stack.A(stack_estimate), compute = FALSE),
     lincomb = lc
@@ -150,8 +171,8 @@ fit_model <- function(
   ) -> stack_trend
   inla.stack(stack_estimate, stack_trend) -> stack
   m1 <- inla(
-    model_formula, family = "cbinomial",
-    Ntrials = cbind(k = 1, n = c(base_data$visits, trend_prediction$visits)),
+    model_formula, family = "binomial",
+    Ntrials = 1,
     data = inla.stack.data(stack), control.compute = list(waic = TRUE),
     control.predictor = list(A = inla.stack.A(stack), compute = TRUE, link = 1),
     control.mode = list(theta = m0$mode$theta, restart = FALSE, fixed = TRUE)
@@ -202,11 +223,8 @@ fit_model <- function(
   ) -> stack_field
   inla.stack(stack_estimate, stack_prediction, stack_field) -> stack2
   m2 <- inla(
-    model_formula, family = "cbinomial",
-    Ntrials = cbind(
-      k = 1,
-      n = c(base_data$visits, base_prediction$visits, field_prediction$visits)
-    ),
+    model_formula, family = "binomial",
+    Ntrials = 1,
     data = inla.stack.data(stack2),
     control.predictor = list(
       A = inla.stack.A(stack2), compute = TRUE, link = 1

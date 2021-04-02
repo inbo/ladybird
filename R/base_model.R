@@ -5,11 +5,13 @@
 #' @export
 #' @importFrom assertthat assert_that is.flag noNA
 #' @importFrom dplyr arrange bind_cols bind_rows distinct inner_join mutate
-#' select %>%
+#' select starts_with %>%
 #' @importFrom git2rdata read_vc
 #' @importFrom rlang .data !!
 #' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom stats setNames
 #' @importFrom tidyr complete
+#' @importFrom utils head
 base_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
   knots = c(1990, 2000, 2010, 2020)
@@ -37,7 +39,7 @@ base_model <- function(
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3, secondary = NA_real_,
       iyear = .data$year - min(.data$year) + 1,
-      visits = pmin(.data$visits, 30)
+      log_visits = log(.data$visits), secondary = NA_real_
     ) %>%
     add_knots(knots = knots) -> base_data
 
@@ -49,7 +51,7 @@ base_model <- function(
         select(.data$year, starts_with("knot")) %>%
         distinct()
     ) %>%
-    mutate(secondary = NA_real_, visits = 1) -> trend_prediction
+    mutate(secondary = NA_real_) -> trend_prediction
 
   base_data %>%
     distinct(.data$location, .data$year) %>%
@@ -61,7 +63,7 @@ base_model <- function(
     ) %>%
     mutate(
       iyear = .data$year - min(.data$year) + 1,
-      secondary = NA_real_, visits = 1
+      secondary = NA_real_
     ) %>%
     add_knots(knots = knots) %>%
     mutate(secondary = NA_real_, visits = 1) %>%
@@ -70,8 +72,7 @@ base_model <- function(
   expand.grid(
     X = pretty(base_data$X, 20),
     Y = pretty(base_data$Y, 20),
-    year = knots,
-    visits = 1
+    year = knots
   ) -> field_prediction
 
   results <- fit_model(
