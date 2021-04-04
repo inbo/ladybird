@@ -16,7 +16,9 @@
 #' @importFrom rlang .data
 #' @importFrom sf st_as_sf st_coordinates st_transform
 import_data <- function(
-  belgium_occurrence, belgium_visits, output, strict = TRUE
+  belgium_occurrence, belgium_visits,
+  netherlands_occurrence, netherlands_visits,
+  output, strict = TRUE
 ) {
   assert_that(is.string(belgium_occurrence), is.string(belgium_visits))
   assert_that(is.string(netherlands_occurrence), is.string(netherlands_visits))
@@ -79,9 +81,14 @@ import_data <- function(
       country = factor("BE", levels = c("BE", "NL", "GB")),
       location = .data$utm1km, long = .data$X, lat = .data$Y
     ) -> raw_belgium
-  st_as_sf(
-    raw_netherlands, coords = c("centroid_x", "centroid_y"), crs = 28992
-  ) %>%
+  raw_netherlands %>%
+    mutate(
+      centroid_x = .data$centroid_x * 1000,
+      centroid_y = .data$centroid_y * 1000
+    ) %>%
+    st_as_sf(
+      coords = c("centroid_x", "centroid_y"), crs = 28992
+    ) %>%
     st_transform(crs = 4326) %>%
     st_coordinates() %>%
     as.data.frame() %>%
@@ -139,3 +146,4 @@ import_data <- function(
       sorting = c("location", "year", "taxon_key"), stage = TRUE
     )
 }
+

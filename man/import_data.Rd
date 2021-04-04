@@ -4,7 +4,14 @@
 \alias{import_data}
 \title{Import and standardise the raw data}
 \usage{
-import_data(belgium_occurrence, belgium_visits, output, strict = TRUE)
+import_data(
+  belgium_occurrence,
+  belgium_visits,
+  netherlands_occurrence,
+  netherlands_visits,
+  output,
+  strict = TRUE
+)
 }
 \arguments{
 \item{belgium_occurrence}{path to the CSV file with the Belgian occurrence
@@ -12,17 +19,17 @@ data.}
 
 \item{belgium_visits}{path to the CSV file with the Belgian visit data.}
 
+\item{netherlands_occurrence}{path to the CSV file with the Dutch occurrence
+data.}
+
+\item{netherlands_visits}{path to the CSV file with the Dutch visit data.}
+
 \item{output}{path to the root of the data package}
 
 \item{strict}{What to do when the metadata changes. \code{strict = FALSE}
 overwrites the data and the metadata with a warning listing the changes,
 \code{strict = TRUE} returns an error and leaves the data and metadata as is.
 Defaults to \code{TRUE}.}
-
-\item{netherlands_occurrence}{path to the CSV file with the Dutch occurrence
-data.}
-
-\item{netherlands_visits}{path to the CSV file with the Dutch visit data.}
 }
 \description{
 Import and standardise the raw data
