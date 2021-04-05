@@ -73,12 +73,7 @@ fit_model <- function(
   ) -> stack_estimate
 
   fixed_formula <- sprintf(
-    ifelse(
-      is_secondary,
-      "occurrence ~ 0 + log_visits + %1$s + (%1$s):secondary",
-      "occurrence ~ 0 + log_visits + %s"
-    ),
-    paste(time_vars, collapse = " + ")
+    "occurrence ~ 0 + %s", paste(time_vars, collapse = " + ")
   )
   rw_formula <- "f(
     iyear, model = \"rw1\",

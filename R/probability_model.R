@@ -47,7 +47,8 @@ probability_model <- function(
     st_drop_geometry() %>%
     inner_join(
       load_relevant(
-        min_occurrences = min_occurrences, min_species = min_species
+        min_occurrences = min_occurrences, min_species = min_species,
+        country = which_country
       ),
       by = "location"
     ) %>%

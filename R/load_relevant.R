@@ -2,14 +2,23 @@
 #' @param min_occurrences The minimum number of occurrences per species.
 #' @param min_species The minimum number of species recorded at the combination
 #'   of location and year.
+#' @param country Data from which country to select.
 #' @export
 #' @importFrom assertthat assert_that is.count
 #' @importFrom dplyr filter group_by inner_join n transmute ungroup
 #' @importFrom git2rdata read_vc
 #' @importFrom tidyr pivot_wider
-load_relevant <- function(min_occurrences = 1000, min_species = 3) {
+load_relevant <- function(
+  min_occurrences = 1000, min_species = 3, country = c("BE", "NL")
+) {
   assert_that(is.count(min_occurrences), is.count(min_species))
-  read_vc("occurrence", system.file(package = "ladybird")) %>%
+  which_country <- match.arg(country)
+  read_vc("location", system.file(package = "ladybird")) %>%
+    filter(.data$country == which_country) %>%
+    semi_join(
+      x = read_vc("occurrence", system.file(package = "ladybird")),
+      by = "location"
+    ) %>%
     group_by(.data$taxon_key) %>%
     filter(n() >= min_occurrences) -> relevant
   relevant %>%

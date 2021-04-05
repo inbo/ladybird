@@ -48,7 +48,8 @@ cumulative_model <- function(
     st_drop_geometry() %>%
     inner_join(
       load_relevant(
-        min_occurrences = min_occurrences, min_species = min_species
+        min_occurrences = min_occurrences, min_species = min_species,
+        country = which_country
       ),
       by = "location"
     ) %>%
@@ -151,7 +152,7 @@ cumulative_model <- function(
     c(
       species = species, secondary = secondary$species,
       min_occurrences = min_occurrences, min_species = min_species,
-      results, type = "cumulative", country = which_country
+      results, type = "logit cumulative", country = which_country
     )
   )
 }

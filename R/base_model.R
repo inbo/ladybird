@@ -1,6 +1,5 @@
 #' Fit a base model to a species
 #' @param species Name of the species.
-#' @param country Data from which country to select.
 #' @inheritParams load_relevant
 #' @param knots Which years to use a knots for the piecewise linear regression.
 #' @export
@@ -31,7 +30,8 @@ base_model <- function(
     st_drop_geometry() %>%
     inner_join(
       load_relevant(
-        min_occurrences = min_occurrences, min_species = min_species
+        min_occurrences = min_occurrences, min_species = min_species,
+        country = which_country
       ),
       by = "location"
     ) %>%
