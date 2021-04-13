@@ -12,7 +12,7 @@ params:
 
 ```{r setup, include=FALSE}
 library(knitr)
-opts_chunk$set(echo = FALSE)
+opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE)
 options(knitr.kable.NA = '')
 library(ladybird)
 library(tidyverse)
@@ -21,36 +21,36 @@ library(scales)
 library(INBOtheme)
 ```
 
-```{r load-models}
+```{r load-models, results = "hide"}
 dirname(params$models) %>%
   file.path("..") %>%
   list.files(full.names = TRUE, recursive = TRUE) %>%
   map(readRDS) -> base_models
 species <- map_chr(base_models, "species")
 waic <- map_dbl(base_models, "waic")
-map_lgl(base_models, "first_order") %>%
-  ifelse(1, 2) -> rw_order
 model_type <- map_chr(base_models, "type")
+country <- map_chr(base_models, "country")
 map(base_models, "hyperpar") %>%
   map(rownames_to_column, var = "parameter") %>%
   map2(species, ~mutate(.x, species = .y)) %>%
-  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
   bind_rows() -> hyperpar
 map(base_models, "fixed") %>%
   map(rownames_to_column, var = "parameter") %>%
   map2(species, ~mutate(.x, species = .y)) %>%
-  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
   bind_rows() -> fixed
 map(base_models, "trend") %>%
   map2(species, ~mutate(.x, species = .y)) %>%
-  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
   bind_rows() %>%
   mutate(
     type = replace_na(type, ""),
-    prediction = interaction(model, type, sep = " ")
+    prediction = interaction(model, type, sep = " "), 
+    component = ifelse(is.na(iyear), "linear", "linear + rw")
   ) -> trend
 map(base_models, "roc") %>%
   map("ci") %>%
@@ -58,103 +58,159 @@ map(base_models, "roc") %>%
     ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
   ) %>%
   map2(species, ~mutate(.x, species = .y)) %>%
-  map2(rw_order, ~mutate(.x, rw_order = .y)) %>%
   map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
   bind_rows() -> auc
+map(base_models, "field") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> field
+map(base_models, "lincomb") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(model_type, ~mutate(.x, model = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> lincomb
+rm(base_models)
+gc()
 ```
 
 # Compare models
 
-## base model
+## Base model
 
-- $t$: index number of the year
-- $x$: index of the 1 x 1 km square
-- $Y_{tx}$: occurrence of the species
-    - $Y_{tx} = 1$: species recorded in year $t$ at square $x$
-    - $Y_{tx} = 0$: no record of the species in year $t$ at square $x$ but at least $n$ other species recorded
-- $\pi_{tx}$: probability of occurrence in year $t$ at square $x$
-- $\eta_{tx}$: linear predictor on the logit scale of $\pi_{tx}$
-- $\beta_0$: global intercept
-- $\beta_c$: global linear trend along $t$
-- $t_c$: year centred to some reference year $c$. $t_c = t - c$
-- $b_t$: first order or second order random walk along $t$
-- $\sigma^2_r$: variance of the random walk
-- $\omega_{tx}$: Gaussian Markov Random Field (GMRF) with temporal correlation
-- $\rho$: temporal autocorrelation between two consecutive GMRF's.
-- $\xi_{x}$: independent GMRF.
-  GMRF for different time points share the $r$ and $\sigma^2_s$ parameters, but are independent.
-- $\sigma^2_s$: variance of the GMRF over large distances
-- $\Delta_{xy}$: distance between locations $x$ and $y$
-- $C(\Delta_{xy})$: distance based correlation between locations $x$ and $y$
-- $K_\lambda$: modified Bessel function of the second kind
-- $\lambda > 0$: parameter defining the smoothness of the GMRF
-- $\kappa > 0$: scaling parameter
-- $r$: range of the GMRF.
-  This is the distances where the correlation drops below 0.1.
+Let $Y_{tx}$ be the occurrence of a species in year $t$ at square $x$.
+$Y_{tx} = 1$ when we have at least one record of the species in year $t$ at square $x$.
+$Y_{tx} = 0$ when no records of the species in year $t$ at square $x$ but at least 3 other species (excluding _H. axyridis_) recorded.
+Then $\pi_{tx}$ is the probability of occurrence in year $t$ at square $x$.
 
 $$Y_{tx} \sim \mathcal{Bernoulli(\pi_{tx})}$$
 
-$$\pi_{tx} = \frac{\exp\eta_{tx}}{1 + \exp\eta_{tx}}$$
+We use the $\mbox{logit}$ link between $\pi_{tx}$ and the linear predictor $\eta_{tx}$.
 
-$$\eta_{tx} = \beta_0 + \beta_ct_c + b_t + \omega_{tx}$$
+$$\eta_{tx} = \log\big(\frac{\pi_{tx}}{1 - \pi_{tx}}\big)$$
 
-first order random walk
+The linear predictor consists of four components.
+- $E_{tx}$: the monitoring effort.
+- $\beta_k$: a segmented regression modelling the global linear trend per decade.
+- $b_t$: a first order random walk along $t$, modelling deviations from the linear trend per decade.
+- $\omega_{tx}$: Gaussian Markov Random Field (GMRF) with temporal correlation, modelling the residual spatio-temporal autocorrelation.
+
+$$\eta_{tx} = E_{tx} + \beta_k + b_t + \omega_{tx}$$
+
+We base the monitoring effect on the unique number of days with recordings $d_{tx}$ in year $t$ at square $x$.
+
+$$E_{tx} = \beta_d \log d_{tx}$$
+
+We model the global linear trend per decade by defining knot $k_i$ at the start of each decade.
+We define a weight variable $A_i$ for each knot $k_i$.
+
+$$\beta_k = \beta_{1990} A_{1990} + \beta_{2000} A_{2000} + \beta_{2010} A_{2010}+ \beta_{2020} A_{2020}$$
+
+These weight variables are by default $A_i = 0$.
+In the special case when year $t$ coincides with a knot then $A_i = 1$ when $t = k_i$, otherwise $A_i = 0$.
+When year $t$ is between two consecutive knots $k_i$ and $k_{i + 1}$ ($k_i < t < k_{i + 1}$).
+Then we defines the weight variables $A_i$ and $A_{i+1}$ as follows, so that $0 \le A_i \le 1$.
+
+$$A_i = \frac{(k_{i-1} - k_i) - (t - k_i)}{(k_{i-1} - k_i)} \quad \quad A_{i+1} = \frac{t - k_i}{(k_{i-1} - k_i)} $$
+
+$\beta_{k_i}$ will thus depend on the average probability at knot $k_i$.
+The average probability for an intermediate year is a linear interpolation between the nearest knots.
+
+
+The first order random walk models any global deviations from the global linear trend per decade.
+The random steps follow a Gaussian distribution with mean $0$ and variance $\sigma^2_r$.
+
 $$b_t - b_{t - 1} \sim \mathcal{N}(0, \sigma^2_r)$$
 
-second order random walk
-$$(b_{t + 1} - b_t) - (b_t - b_{t - 1}) \sim \mathcal{N}(0, \sigma^2_r)$$
-
+We model the spatio-temporal autocorrelation $\omega_{tx}$ as an AR-1 correlation between Gaussian Markhov Random Fields (GMRF) $\xi_{tx}$.
+$\rho$ is temporal autocorrelation between two consecutive GMRF's.
 $$\omega_{tx} = \rho\omega_{t-1x} + \xi_{tx}$$
+
+The individual GRMF $\xi_{tx}$ are independent but share the $r$ and $\sigma^2_s$ parameters.
+$\sigma^2_s$ is variance of the GMRF at distances larger than $r$.
+While $C(\Delta_{xy})$ the distance based correlation between locations $x$ and $y$, with $\Delta_{xy}$ being the distance between locations $x$ and $y$.
 
 $$\xi_x \sim \mathcal{N}(0, \sigma^2_sC(\Delta_{xy}))$$
 
+$C(\Delta_{xy})$ is defined as below with 
+- $K_\lambda$: modified Bessel function of the second kind;
+- $\lambda > 0$: parameter defining the smoothness of the GMRF;
+- $\kappa > 0$: scaling parameter
+
 $$C(\Delta_{xy}) = \frac{1}{\Gamma(\lambda) 2 ^{\lambda - 1}} (\kappa \Delta_{xy}) ^\lambda K_\lambda (\kappa \Delta_{xy})$$
+We combined the $\lambda$ and $\kappa$ parameters into a single $r$ parameter.
+This is the range of the spatial autocorrelation: the distance at which the correlation between two location location drops below $0.1$.
 
 $$r = \frac{\sqrt{8\lambda}}{\kappa}$$
+## Including the predicted occurrence probability for _H. axyridis_
 
-## Using the probability of a secondary species
+We add a fifth component to the linear predictor $\eta_{tw}$: an interaction between the global linear trend per decade $\beta_k$ and the predicted occurrence probability for _H. axyridis_ on the logit scale.
+The latter is $\eta_{tx}$ of the base model for _H. axyridis_ which we note as $\eta_{tx}^{Ha}$.
 
-For know we use only _H. axyridis_ as the secondary species.
+$$\eta_{tx} = E_{tx} + \beta_k + \beta_k \eta_{tx}^{Ha} + b_t + \omega_{tx}$$
 
-We mention only the new parameters and formulas.
+_H. axyridis_ appeared during the early years of the second decade (2000-2010).
+Therefore we had to remove all years prior to the first occurrence except the year just before the first occurrence.
+As a consequence we had to drop the 1990 for the _H. axyridis_ base model and we have no prediction for the early years.
+We solved the lack of predictions for the early years by replacing the missing predictions with the lowest observed $\eta_{tx}^{Ha}$.
 
-- $t_b$: $t_c$ when $t_c < 0$, otherwise $0$.
-- $\beta_b$: the trend in the period before year $c$.
-- $t_a$: $t_a$ when $t_c > 0$, otherwise $0$.
-- $\beta_a$: the trend in the period after year $c$.
-- $t_a$: either the number of year after year $c$ or 0.
-- $p_{tx}$: the estimated probability for the secondary species in year $t$ and location $x$
-- $\beta_p$: effect of the probability of the secondary species on the random walk
+## Using the cumulative probability of _H. axyridis_
 
-$$\eta_{tx} = \beta_0 + \beta_bt_b + \beta_at_a + (1 + \beta_p p_{tx}) b_t + \omega_{tx}$$
+Here we use interaction between the cumulative predicted probability of _H. axyridis_ ($\pi_{tx}^{Ha}$) and the global linear trend per decade $\beta_k$ as fifth component.
+The cumulative predicted probability is a proxy for the number of years _H. axyridis_ was present in year $t$ at a square $x$.
+We assumed $\pi_{tx}^{Ha} = 0$ when we had no predictions for the early years of the dataset.
 
-## Using the cumulative probability of a secondary species
-
-We replace the individual probability with the cumulative probability.
-This is a proxy for the number of years where a species is present since the start of the dataset.
-
-- $s_{tx}$: the cumulative probability of the secondary species $s_{tx} = \sum_{i = 1}^tp_{ix}$
-
-$$\eta_{tx} = \beta_0 + \beta_bt_b + \beta_at_a + (1 + \beta_p s_{tx}) b_t + \omega_{tx}$$
+$$\eta_{tx} = E_{tx} + \beta_k + \beta_k \sum_{i = 1}^t\pi_{ix} + b_t + \omega_{tx}$$
 
 # Comparing fits
 
 ```{r waic}
-data.frame(species, waic, rw_order = rw_order, model = model_type) %>%
-  group_by(species) %>%
+data.frame(species, waic, model = model_type, country = country) %>%
+  group_by(species, country) %>%
   mutate(
     waic = waic - min(waic),
-    model = interaction(model, rw_order, sep = " ")
+    model = factor(model, levels = c("base", "probability", "cumulative"))
   ) %>%
-  select(-rw_order) %>%
-  arrange(model) %>%
+  arrange(waic) -> delta_waic
+delta_waic %>%
+  filter(waic < 2) %>%
+  summarise(
+    best = paste(sort(model), collapse = " / "),
+    .groups = "drop"
+  ) -> best_model
+delta_waic %>%
   pivot_wider(names_from = model, values_from = waic) %>%
+  inner_join(best_model, by = c("species", "country")
+  ) %>%
+  arrange(best) %>%
   kable(
     digits = 1,
     caption = 
-  "Difference in WAIC compared to the model with lowest WAIC for each species.
+  "Difference in WAIC compared to the model with lowest WAIC for each species
+and country.
 Smaller is better."
   )
+```
+
+
+```{r keep-best-models}
+best_model %>%
+  mutate(model = str_remove(best, " .*")) -> best_model
+auc %>%
+  semi_join(best_model, by = c("species", "country", "model")) -> auc
+fixed %>%
+  semi_join(best_model, by = c("species", "country", "model")) -> fixed
+trend %>%
+  semi_join(best_model, by = c("species", "country", "model")) %>%
+  mutate(
+    id = interaction(species, country, sep = "-") %>%
+      str_replace("_", "-")
+  ) -> trend
+lincomb %>%
+  semi_join(best_model, by = c("species", "country", "model")) -> lincomb
+hyperpar %>%
+  semi_join(best_model, by = c("species", "country", "model")) -> hyperpar
 ```
 
 
@@ -163,12 +219,11 @@ auc %>%
   pivot_wider(names_from = parameter, values_from = auc) %>%
   mutate(
     species = reorder(species, estimate),
-    order = factor(rw_order)
   ) %>%
   ggplot(
     aes(
       x = estimate, xmin = lcl, xmax = ucl, y = species, colour = model,
-      linetype = order, shape = order
+      linetype = country, shape = country
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
@@ -177,186 +232,146 @@ auc %>%
   ggtitle("AUC")
 ```
 
-```{r waic-auc, fig.cap = "WAIC versus AUC."}
-data.frame(species, waic, rw_order = rw_order, model = model_type) %>%
-  group_by(species) %>%
-  mutate(
-    waic = waic - min(waic)
-  ) %>%
-  ungroup() %>%
-  inner_join(
-    auc %>%
-      pivot_wider(names_from = parameter, values_from = auc),
-    by = c("species", "rw_order", "model")
-  ) %>%
-  mutate(order = factor(rw_order)) %>%
-  ggplot(
-    aes(
-      x = waic, y = estimate, ymin = lcl, ymax = ucl, colour = model,
-      shape = order, linetype = order)
-  ) +
-  geom_point() +
-  geom_errorbar() +
-  facet_wrap(~species, scales = "free") +
-  scale_x_sqrt() +
-  scale_y_continuous("AUC")
-```
-
 # Fixed effects
 
-```{r intercept, fig.cap = "Intercept of the models"}
-fixed %>%
-  filter(parameter == "intercept") %>%
-  mutate(
-    species = reorder(species, mean),
-    median = `0.5quant`,
-    lcl = `0.025quant`,
-    ucl = `0.975quant`
-  ) %>%
-  ggplot(aes(x = median, xmin = lcl, xmax = ucl, y = species, colour = model)) +
-  geom_errorbarh(position = position_dodge(0.5)) +
-  geom_point(position = position_dodge(0.5)) +
-  facet_wrap(~rw_order, scales = "free_x") +
-  theme(axis.title = element_blank())
-```
+## Effect of number of days
 
-```{r trends, fig.cap = "Parameters for the linear trend components."}
+```{r logvisit, fig.cap = "Parameter estimates for log number of days."}
 fixed %>%
-  filter(parameter != "intercept") %>%
+  filter(parameter == "log_visits") %>%
   mutate(
-    species = reorder(species, mean),
-    median = `0.5quant`,
-    lcl = `0.025quant`,
-    ucl = `0.975quant`
+    species = reorder(species, mean)
   ) %>%
   ggplot(
     aes(
-      x = median, xmin = lcl, xmax = ucl, y = species, colour = model,
-      linetype = parameter, shape = parameter
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = country
     )
   ) +
-  geom_errorbarh(position = position_dodge(0.5)) +
-  geom_point(position = position_dodge(0.5)) +
   geom_vline(xintercept = 0, linetype = 2) +
-  facet_wrap(~rw_order, scales = "free_x") +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
   theme(axis.title = element_blank())
 ```
 
-```{r}
-p <- fixed %>%
-  filter(parameter != "intercept", rw_order == 1, model != "base") %>%
-  select(model, species, parameter, mean, lcl = `0.025quant`, ucl = `0.975quant`) %>%
-  pivot_longer(c(mean, lcl, ucl)) %>%
-  pivot_wider(names_from = c(parameter, name)) %>%
+## Knots
+
+```{r knots-knot, fig.cap = "Parameters for the knot components split by knot."}
+fixed %>%
+  filter(str_detect(parameter, "knot")) %>%
+  mutate(
+    secondary = str_detect(parameter, "secondary"),
+    knot = str_replace(parameter, "knot_([0-9]{4}).*", "\\1"),
+    median = `0.5quant`,
+    lcl = `0.025quant`,
+    ucl = `0.975quant`,
+    species = reorder(species, median)
+  ) -> fixed_knots
+fixed_knots %>%
   ggplot(
     aes(
-      x = before_mean, xmin = before_lcl, xmax = before_ucl, y = after_mean, 
-      ymin = after_lcl, ymax = after_ucl, colour = model, label = species
+      x = median, xmin = lcl, xmax = ucl, y = species, colour = country,
+      linetype = secondary, shape = secondary
     )
   ) +
-  geom_hline(yintercept = 0, linetype = 3) +
-  geom_vline(xintercept = 0, linetype = 3) +
-  geom_abline(linetype = 3) +
-  geom_errorbarh() +
-  geom_errorbar() +
-  geom_point() +
-  scale_x_continuous("trend before 2001") +
-  scale_y_continuous("trend after 2001")
-ggplotly(p, tooltip = "species")
+  geom_errorbarh(position = position_dodge(0.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  theme(axis.title = element_blank()) +
+  facet_wrap(~knot)
 ```
 
-## General trends
+```{r knots-country}
+ggplot(
+  fixed_knots,
+  aes(
+    x = median, xmin = lcl, xmax = ucl, y = species, colour = knot,
+    linetype = secondary, shape = secondary
+  )
+) +
+  geom_errorbarh(position = position_dodge(0.5)) +
+  geom_point(position = position_dodge(0.5)) +
+  theme(axis.title = element_blank()) +
+  facet_wrap(~country)
+```
 
+## Trends based on difference between knots
+
+```{r trends, fig.cap = "log odd ratio for trends over decades based on only main effects."}
+lincomb %>%
+  mutate(
+    effect = ifelse(
+      str_detect(decade, ":"),
+      str_remove(decade, ".*:"),
+      "2"
+    ) %>%
+      factor(
+        levels = c("2", "0", "1"), labels = c("main", "interaction", "combined")
+      ),
+    decade = str_remove(decade, ":.*"),
+    species = reorder(species, mean)
+  ) -> lc
+lc %>%
+  filter(effect == "main") %>%
+  ggplot(
+    aes(
+      x = mean, xmin = lcl, xmax = ucl, y = species,
+      colour = decade
+    )
+  ) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  facet_wrap(~country) +
+  theme(axis.title = element_blank())
+```
+
+```{r trends-interaction, fig.cap = "log odd ratio for main and interaction trends over decades. Only for species with an interaction model"}
+lc %>%
+  filter(model != "base", effect != "combined") %>%
+  ggplot(
+    aes(
+      x = mean, xmin = lcl, xmax = ucl, y = species, colour = country,
+      linetype = effect, shape = effect
+    )
+  ) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  facet_wrap(~decade) +
+  theme(axis.title = element_blank())
+```
+
+# General trends
+
+- **min**: prediction using the minimum predicted occurrence of _H. axyridis_ for that year
+- **max**: prediction using the maximum predicted occurrence of _H. axyridis_ for that year
 - **median**: prediction using the median predicted occurrence of _H. axyridis_ for that year
 - **without**: prediction assuming the predicted occurrence of _H. axyridis_ is 0%
 
-Panels indicate first and second order random walks
-
-```{r trends-adal-bipu}
-plot_trend <- function(this_species) {
-  trend %>%
-    filter(species  == this_species, type %in% c("median", "without", "")) %>%
-    ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
-    geom_ribbon(aes(fill = prediction, colour = prediction), alpha = 0.3, linetype = 3) +
-    geom_line(aes(colour = prediction)) +
-    scale_y_continuous(labels = percent) +
-    theme(axis.title = element_blank()) +
-    ggtitle(this_species) +
-    facet_wrap(~rw_order, scales = "free_y")
-}
-plot_trend("Adal_bipu")
+```{r species_trends, results = "asis"}
+unique(trend$id) %>%
+  sapply(
+    function(id) {
+      knit_expand("_trend.Rmd", id = id)
+    }
+  ) %>%
+  paste(collapse = "\n") -> rmd
+knit(text = rmd, quiet = TRUE) %>%
+  cat()
 ```
 
-```{r trends-adal-dece}
-plot_trend("Adal_dece")
-```
-
-```{r trends-calv-dece}
-plot_trend("Calv_dece")
-```
-
-```{r trends-calv-quat}
-plot_trend("Calv_quat")
-```
-
-```{r trends-cocc-sept}
-plot_trend("Cocc_sept")
-```
-
-
-```{r trends-cocc-quin}
-plot_trend("Cocc_quin")
-```
-
-```{r trends-exoc-quad}
-plot_trend("Exoc_quad")
-```
-
-```{r trends-haly-sede}
-plot_trend("Haly_sede")
-```
-
-```{r trends-harm-axyr}
-plot_trend("Harm_axyr")
-```
-
-```{r trends-harm-quad}
-plot_trend("Harm_quad")
-```
-
-```{r trends-hipp_vari}
-plot_trend("Hipp_vari")
-```
-
-```{r trends-oeno-cong}
-plot_trend("Oeno_cong")
-```
-
-```{r trends-prop-quat}
-plot_trend("Prop_quat")
-```
-
-```{r trends-psyl-vigi}
-plot_trend("Psyl_vigi")
-```
-
-```{r trends-tytt-sede}
-plot_trend("Tytt_sede")
-```
-
-## Spatio-temporal fields
+# Spatio-temporal fields
 
 ```{r sec-range}
 hyperpar %>%
   filter(parameter == "Range for site") %>%
   mutate(
-    species = reorder(species, mean),
-    order = factor(rw_order)
+    species = reorder(species, mean)
   ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model, linetype = order, shape = order
+      colour = country
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
@@ -370,19 +385,18 @@ hyperpar %>%
 hyperpar %>%
   filter(parameter == "Stdev for site") %>%
   mutate(
-    species = reorder(species, mean),
-    order = factor(rw_order)
+    species = reorder(species, mean)
   ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model, linetype = order, shape = order
+      colour = country
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   scale_x_continuous(limits = c(0, NA)) +
-  ggtitle("Stdev of the spatio-temporal field in km") +
+  ggtitle("Stdev of the spatio-temporal field") +
   theme(axis.title = element_blank())
 ```
 
@@ -390,13 +404,12 @@ hyperpar %>%
 hyperpar %>%
   filter(parameter == "GroupRho for site", !is.na(mean)) %>%
   mutate(
-    species = reorder(species, mean),
-    order = factor(rw_order)
+    species = reorder(species, mean)
   ) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model, linetype = order, shape = order
+      colour = country
     )
   ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
@@ -405,64 +418,23 @@ hyperpar %>%
   theme(axis.title = element_blank())
 ```
 
-## Random walk hyper parameters
-
-
-```{r beta-p}
-hyperpar %>%
-  filter(parameter == "Beta for iyear2", !is.na(mean), sd < 1e6) %>%
-  mutate(
-    species = reorder(species, mean),
-    order = factor(rw_order)
-  ) %>%
-  ggplot(
-    aes(
-      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = model, linetype = order, shape = order
-    )
-  ) +
-  geom_errorbarh(position = position_dodge(width = 0.5)) +
-  geom_point(position = position_dodge(width = 0.5)) +
-  ggtitle("Beta for the random walk") +
-  theme(axis.title = element_blank())
-```
-
+# Random walk hyper parameters
 
 ```{r sigma-p}
 hyperpar %>%
   filter(parameter == "Precision for iyear", !is.na(mean)) %>%
   mutate(
     species = reorder(species, mean),
-    order = factor(rw_order),
-    median = 1 / `0.5quant`,
-    lcl = 1 / `0.025quant`,
-    ucl = 1 / `0.975quant`
+    median = sqrt(1 / `0.5quant`),
+    lcl = sqrt(1 / `0.025quant`),
+    ucl = sqrt(1 / `0.975quant`)
   ) %>%
-  ggplot(aes(x = median, xmin = lcl, xmax = ucl, y = species)) +
+  ggplot(
+    aes(x = median, xmin = lcl, xmax = ucl, y = species, colour = country)
+  ) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   ggtitle("Stdev for the random walk") +
-  theme(axis.title = element_blank()) +
-  facet_wrap(~ rw_order + model, scales = "free_x")
-```
-
-```{r}
-hyperpar %>%
-  filter(parameter == "Beta for iyear2", !is.na(mean), sd < 1e6) %>%
-  select(
-    species, model, rw_order, beta_median = `0.5quant`, beta_lcl = `0.025quant`,
-    beta_ucl = `0.975quant`
-  ) %>%
-  inner_join(
-    hyperpar %>%
-      filter(parameter == "Precision for iyear", !is.na(mean)) %>%
-      transmute(
-        species, model, rw_order, sd_median = 1 / sqrt(`0.5quant`),
-        sd_lcl = 1 / sqrt(`0.025quant`), sd_ucl = 1 / sqrt(`0.975quant`)
-      ),
-    by = c("species", "model", "rw_order")
-  ) %>%
-  mutate(type = interaction(model, rw_order)) %>%
-  ggplot(aes(x = beta_median, y = sd_median, colour = type)) +
-  geom_point()
+  scale_x_continuous(limits = c(0, NA)) +
+  theme(axis.title = element_blank())
 ```

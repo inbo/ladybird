@@ -11,6 +11,7 @@ taxon_key	scientific_name	code
 9	Coccinula quatuordecimpustulata	Cocc_quat
 10	Propylea quatuordecimpunctata	Prop_quat
 11	Anisosticta novemdecimpunctata	Anis_nove
+37	Adalia conglomerata	Adal_cong
 12	Adalia decempunctata	Adal_dece
 13	Calvia decemguttata	Calv_dece
 14	Myrrha octodecimguttata	Myrr_octo
@@ -36,3 +37,4 @@ taxon_key	scientific_name	code
 33	Oenopia conglobata	Oeno_cong
 34	Exochomus quadripustulatus	Exoc_quad
 35	Oenopia impustulata	Oeno_impu
+39	Ceratomegilla undecimnotata	Cera_unde
