@@ -152,7 +152,7 @@ cumulative_model <- function(
     c(
       species = species, secondary = secondary$species,
       min_occurrences = min_occurrences, min_species = min_species,
-      results, type = "logit cumulative", country = which_country
+      results, type = "cumulative", country = which_country
     )
   )
 }

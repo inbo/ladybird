@@ -59,14 +59,16 @@ probability_model <- function(
     filter(.data$year >= min(.data$year[.data$occurrence == 1]) - 1) %>%
     left_join(
       secondary$predictions %>%
-        select(.data$year, .data$location, secondary = .data$mean),
+        select(.data$year, .data$location, secondary = .data$lp_mean),
       by = c("year", "location")
     ) %>%
     add_knots(knots = knots) %>%
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3,
       iyear = .data$year - min(.data$year) + 1,
-      secondary = replace_na(.data$secondary, 0),
+      secondary = replace_na(
+        .data$secondary, min(.data$secondary, na.rm = TRUE)
+      ),
       log_visits = log(.data$visits)
     ) %>%
     mutate(
@@ -80,15 +82,14 @@ probability_model <- function(
     colnames() -> drop_knot
   base_data %>%
     select(-all_of(drop_knot)) -> base_data
-
   base_data %>%
     group_by(.data$year) %>%
     summarise(
       median = median(.data$secondary, na.rm = TRUE),
       min = min(.data$secondary, na.rm = TRUE),
       max = max(.data$secondary, na.rm = TRUE),
-      everywhere = 1,
-      without = 0
+      everywhere = 10,
+      without = -10
     ) %>%
     pivot_longer(-.data$year, names_to = "type", values_to = "secondary") %>%
     arrange(.data$year, .data$type) %>%
@@ -112,12 +113,15 @@ probability_model <- function(
       by = "location"
     ) %>%
     add_knots(knots = knots) %>%
-    inner_join(
+    left_join(
       secondary$predictions %>%
-        select(.data$year, .data$location, secondary = .data$mean),
+        select(.data$year, .data$location, secondary = .data$lp_mean),
       by = c("year", "location")
     ) %>%
     mutate(
+      secondary = replace_na(
+        .data$secondary, min(.data$secondary, na.rm = TRUE)
+      ),
       across(
         starts_with("knot"), list(secondary = ~ `*`(.x, .data$secondary))
       )
@@ -143,7 +147,7 @@ probability_model <- function(
     c(
       species = species, secondary = secondary$species,
       min_occurrences = min_occurrences, min_species = min_species,
-      results, type = "proportion", country = which_country
+      results, type = "probability", country = which_country
     )
   )
 }

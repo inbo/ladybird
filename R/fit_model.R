@@ -73,7 +73,7 @@ fit_model <- function(
   ) -> stack_estimate
 
   fixed_formula <- sprintf(
-    "occurrence ~ 0 + %s", paste(time_vars, collapse = " + ")
+    "occurrence ~ 0 + log_visits + %s", paste(time_vars, collapse = " + ")
   )
   rw_formula <- "f(
     iyear, model = \"rw1\",
@@ -157,6 +157,8 @@ fit_model <- function(
       "decade", "mean", median = "0.5quant", lcl = "0.025quant",
       ucl = "0.975quant"
     ) -> lincomb
+  fixed <- m0$summary.fixed
+  hyperpar <- m0$summary.hyperpar
 
   inla.stack(
     data = data.frame(occurrence = NA),
@@ -183,6 +185,9 @@ fit_model <- function(
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
     as_tibble() %>%
     bind_cols(trend_prediction) -> trend
+  waic <- m1$waic$waic
+  rm(m1)
+  gc()
 
   base_prediction %>%
     select(.data$X, .data$Y) %>%
@@ -241,12 +246,14 @@ fit_model <- function(
     select(.data$mean, median = 4, lcl = 3, ucl = 5) %>%
     as_tibble() %>%
     bind_cols(field_prediction) -> field
+  rm(m0, m2)
+  gc()
+
 
   return(
     list(
-      fixed = m0$summary.fixed, trend = trend, field = field,
-      hyperpar = m0$summary.hyperpar, predictions = predictions,
-      waic = m1$waic$waic, roc = roc_curve, lincomb = lincomb
+      fixed = fixed, trend = trend, field = field, hyperpar = hyperpar,
+      predictions = predictions, waic = waic, roc = roc_curve, lincomb = lincomb
     )
   )
 }
