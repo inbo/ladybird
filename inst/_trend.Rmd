@@ -1,0 +1,116 @@
+```{r {{id}}-subset}
+if (interactive()) {
+  this_id <- sample(trend$id, 1)
+} else {
+  this_id <- "{{id}}"
+}
+this_trend <- trend %>%
+  filter(id == this_id)
+```
+
+## `r this_trend$species[1]` in `r this_trend$country[1]`
+
+The selected model is `r this_trend$model[1]`.
+
+### Trends using only the segmented regression
+
+```{r {{id}}-base, eval = this_trend$model[1] == "base"}
+this_trend %>%
+  filter(component == "linear") %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(alpha = 0.3, linetype = 3) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-non-base, eval = this_trend$model[1] != "base", fig.cap = "Trends ignoring the interaction term"}
+this_trend %>%
+  filter(component == "linear", type == "without") %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(alpha = 0.3, linetype = 3) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-non-base-min-max, eval = this_trend$model[1] != "base", fig.cap = "Trends taking the interaction term into account"}
+this_trend %>%
+  filter(component == "linear", type %in% c("min", "max", "median")) %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(
+    aes(fill = type, colour = type), alpha = 0.3, linetype = 3
+  ) +
+  geom_line(aes(colour = type)) +
+  scale_y_continuous(labels = percent) +
+  labs(colour = "H. axyridis", fill = "H. axyridis") +
+  theme(axis.title = element_blank())
+```
+
+### Trends combining the segmented regression and the random walk
+
+```{r {{id}}-rw-base, eval = this_trend$model[1] == "base"}
+this_trend %>%
+  filter(component == "linear + rw") %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(alpha = 0.3, linetype = 3) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-rw-median, eval = this_trend$model[1] != "base", fig.cap = "Trends assuming median values for H. axyridis."}
+this_trend %>%
+  filter(component == "linear + rw", type == "median") %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(alpha = 0.3, linetype = 3) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-rw-min-max, eval = this_trend$model[1] != "base", fig.cap = "Trends including H. axyridis."}
+this_trend %>%
+  filter(component == "linear + rw", type %in% c("median", "min", "max")) %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(
+    aes(fill = type, colour = type), alpha = 0.3, linetype = 3
+  ) +
+  geom_line(aes(colour = type)) +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```
+
+### Influence of random walk
+
+```{r {{id}}-base-rw, eval = this_trend$model[1] == "base"}
+hyperpar %>%
+  filter(parameter == "Precision for iyear") %>%
+  semi_join(this_trend, by = c("species", "country", "model")) %>%
+  transmute(
+    sigma = sprintf(
+      "sigma = %.02f (%0.2f; %0.2f)", sqrt(1 / `0.5quant`),
+      sqrt(1 / `0.975quant`), sqrt(1 / `0.025quant`)
+    )
+  ) -> sigma_value
+this_trend %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(aes(group = component), alpha = 0.3, linetype = 3) +
+  geom_line(aes(linetype = component)) +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank()) +
+  ggtitle(sigma_value$sigma)
+```
+
+
+```{r {{id}}-base-rw-min-max, eval = this_trend$model[1] != "base", fig.cap = "Trends including H. axyridis."}
+this_trend %>%
+  filter(type %in% c("median", "min", "max")) %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(
+    aes(fill = type, group = interaction(type, component)), alpha = 0.3, linetype = 3
+  ) +
+  geom_line(aes(colour = type, linetype = component)) +
+  scale_y_continuous(labels = percent) +
+  theme(axis.title = element_blank())
+```

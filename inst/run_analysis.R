@@ -33,7 +33,7 @@ for (species in available_species) {
   gc()
 }
 
-dir.create(file.path(output_dir, "..", "probability_logit"), showWarnings = FALSE)
+dir.create(file.path(output_dir, "..", "probability"), showWarnings = FALSE)
 secondary <- readRDS(
   sprintf(
     "%s/%s_%s_%i_%i.rds", output_dir, "harm_axyr", tolower(country),
@@ -45,7 +45,7 @@ for (species in available_species) {
     next
   }
   output <- sprintf(
-    "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "probability_logit"),
+    "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "probability"),
     tolower(species), tolower(country), min_occurrences, min_species
   )
   if (file.exists(output)) {
@@ -126,7 +126,7 @@ for (species in available_species) {
     next
   }
   output <- sprintf(
-    "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "probability_logit"),
+    "%s/%s_%s_%i_%i.rds", file.path(output_dir, "..", "probability"),
     tolower(species), tolower(country), min_occurrences, min_species
   )
   if (file.exists(output)) {

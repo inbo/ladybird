@@ -16,6 +16,7 @@
 #' @importFrom rlang .data
 #' @importFrom stats as.formula
 #' @importFrom tibble rownames_to_column
+#' @importFrom tidyselect ends_with
 fit_model <- function(
   base_data, trend_prediction, base_prediction, field_prediction, knots
 ) {
@@ -97,9 +98,9 @@ fit_model <- function(
       decade = gsub("^knot_([0-9]{4}).*", "\\1", .data$before),
       period = gsub("^knot_([0-9]{4}).*", "\\1", .data$after) %>%
         as.integer() %>%
-        `-`(as.integer(decade))
+        `-`(as.integer(.data$decade))
     ) %>%
-    filter(period > 0) %>%
+    filter(.data$period > 0) %>%
     pivot_longer(c("after", "before")) %>%
     transmute(
       .data$decade, .data$value,

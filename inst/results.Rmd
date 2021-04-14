@@ -25,6 +25,7 @@ library(INBOtheme)
 dirname(params$models) %>%
   file.path("..") %>%
   list.files(full.names = TRUE, recursive = TRUE) %>%
+  str_subset(pattern = "smoother", negate = TRUE) %>%
   map(readRDS) -> base_models
 species <- map_chr(base_models, "species")
 waic <- map_dbl(base_models, "waic")

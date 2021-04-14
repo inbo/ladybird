@@ -1,0 +1,379 @@
+---
+title: "Results"
+author: "Thierry Onkelinx"
+date: "8-3-2021"
+output: html_document
+params:
+  models:
+    label: "Select a base model"
+    value: "../../Analysis/models/smoother/harm_axyr_1000_3.rds"
+    input: file
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE)
+options(knitr.kable.NA = '')
+library(ladybird)
+library(tidyverse)
+library(plotly)
+library(scales)
+library(INBOtheme)
+library(effectclass)
+```
+
+```{r load-models, results = "hide"}
+dirname(params$models) %>%
+  list.files(full.names = TRUE, recursive = TRUE) %>%
+  map(readRDS) -> base_models
+species <- map_chr(base_models, "species")
+waic <- map_dbl(base_models, "waic")
+country <- map_chr(base_models, "country")
+map(base_models, "hyperpar") %>%
+  map(rownames_to_column, var = "parameter") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> hyperpar
+map(base_models, "fixed") %>%
+  map(rownames_to_column, var = "parameter") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> fixed
+map(base_models, "trend") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() %>%
+  arrange(species, country) %>%
+  mutate(
+    id = interaction(species, country, sep = "-") %>%
+           str_replace_all("_", "-")
+  ) -> trend
+map(base_models, "roc") %>%
+  map("ci") %>%
+  map(
+    ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
+  ) %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> auc
+map(base_models, "field") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> field
+map(base_models, "lincomb") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() %>%
+  mutate(duration = factor(duration)) -> lincomb
+map(base_models, "prediction") %>%
+  map2(species, ~mutate(.x, species = .y)) %>%
+  map2(country, ~mutate(.x, country = .y)) %>%
+  bind_rows() -> predictions
+rm(base_models)
+gc()
+```
+
+# Model
+
+Let $Y_{tx}$ be the occurrence of a species in year $t$ at square $x$.
+$Y_{tx} = 1$ when we have at least one record of the species in year $t$ at square $x$.
+$Y_{tx} = 0$ when no records of the species in year $t$ at square $x$ but at least 3 other species (excluding _H. axyridis_) recorded.
+Then $\pi_{tx}$ is the probability of occurrence in year $t$ at square $x$.
+
+$$Y_{tx} \sim \mathcal{Bernoulli(\pi_{tx})}$$
+
+We use the $\mbox{logit}$ link between $\pi_{tx}$ and the linear predictor $\eta_{tx}$.
+
+$$\eta_{tx} = \log\big(\frac{\pi_{tx}}{1 - \pi_{tx}}\big)$$
+
+The linear predictor consists of four components.
+- $\beta_0$: the overall average.
+- $E_{tx}$: the monitoring effort.
+- $b_t$: a second order random walk along $t$, modelling deviations from the linear trend per decade.
+- $\omega_{tx}$: Gaussian Markov Random Field (GMRF) with temporal correlation, modelling the residual spatio-temporal autocorrelation.
+
+$$\eta_{tx} = E_{tx} + \beta_k + b_t + \omega_{tx}$$
+
+We base the monitoring effect on the unique number of days with recordings $d_{tx}$ in year $t$ at square $x$.
+
+$$E_{tx} = \beta_d \log d_{tx}$$
+
+The second order random walk models the average change over time.
+A first order random walk models the difference between consecutive years.
+A second order random models the difference between consecutive first order differences.
+The random steps follow a Gaussian distribution with mean $0$ and variance $\sigma^2_r$.
+
+$$(b_{t + 1} - b_t) - (b_t - b_{t - 1}) \sim \mathcal{N}(0, \sigma^2_r)$$
+
+We model the spatio-temporal autocorrelation $\omega_{tx}$ as an AR-1 correlation between Gaussian Markhov Random Fields (GMRF) $\xi_{tx}$.
+$\rho$ is temporal autocorrelation between two consecutive GMRF's.
+$$\omega_{tx} = \rho\omega_{t-1x} + \xi_{tx}$$
+
+The individual GRMF $\xi_{tx}$ are independent but share the $r$ and $\sigma^2_s$ parameters.
+$\sigma^2_s$ is variance of the GMRF at distances larger than $r$.
+While $C(\Delta_{xy})$ the distance based correlation between locations $x$ and $y$, with $\Delta_{xy}$ being the distance between locations $x$ and $y$.
+
+$$\xi_x \sim \mathcal{N}(0, \sigma^2_sC(\Delta_{xy}))$$
+
+$C(\Delta_{xy})$ is defined as below with 
+- $K_\lambda$: modified Bessel function of the second kind;
+- $\lambda > 0$: parameter defining the smoothness of the GMRF;
+- $\kappa > 0$: scaling parameter
+
+$$C(\Delta_{xy}) = \frac{1}{\Gamma(\lambda) 2 ^{\lambda - 1}} (\kappa \Delta_{xy}) ^\lambda K_\lambda (\kappa \Delta_{xy})$$
+We combined the $\lambda$ and $\kappa$ parameters into a single $r$ parameter.
+This is the range of the spatial autocorrelation: the distance at which the correlation between two location location drops below $0.1$.
+
+$$r = \frac{\sqrt{8\lambda}}{\kappa}$$
+# Comparing fits
+
+```{r auc, fig.cap = "Area under the curve. Higher is better."}
+auc %>%
+  pivot_wider(names_from = parameter, values_from = auc) %>%
+  mutate(
+    species = reorder(species, estimate),
+  ) %>%
+  ggplot(
+    aes(
+      x = estimate, xmin = lcl, xmax = ucl, y = species, colour = country
+    )
+  ) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme(axis.title = element_blank()) +
+  ggtitle("AUC")
+```
+
+# Fixed effects
+
+## Effect of number of days
+
+```{r logvisit, fig.cap = "Parameter estimates for log number of days."}
+fixed %>%
+  filter(parameter == "log_visits") %>%
+  mutate(
+    species = reorder(species, mean)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = country
+    )
+  ) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  theme(axis.title = element_blank())
+```
+
+# General trends
+
+## Trends on the logit scale
+
+The next figures try to help the reader interpreting the effect of linear trend on the logit scale.
+Note that the magnitude of the change depends on the starting proportion.
+
+```{r logit-trend}
+expand.grid(
+  trend = seq(-0.7, 2, length = 41),
+  start = c(0.1, 0.25, 0.5, 0.75, 0.9)
+) %>%
+  mutate(
+    end = plogis(qlogis(start) + trend),
+    fstart = sprintf("%.0f%%", 100 * start)
+  ) %>%
+  ggplot(aes(x = trend, y = end, colour = fstart)) +
+  geom_line() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_hline(aes(yintercept = start, colour = fstart), linetype = 3) +
+  scale_x_continuous("trend on logit scale") +
+  scale_y_continuous("proportion after one year", labels = percent, limits = 0:1) +
+  scale_colour_discrete("starting \nproportion")
+```
+
+```{r logit-trend-5}
+expand.grid(
+  trend = seq(-0.7, 2, length = 41),
+  start = c(0.1, 0.25, 0.5, 0.75, 0.9)
+) %>%
+  mutate(
+    end = plogis(qlogis(start) + 5 * trend),
+    fstart = sprintf("%.0f%%", 100 * start)
+  ) %>%
+  ggplot(aes(x = trend, y = end, colour = fstart)) +
+  geom_line() +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_hline(aes(yintercept = start, colour = fstart), linetype = 3) +
+  scale_x_continuous("trend on logit scale") +
+  scale_y_continuous("proportion after five years", labels = percent, limits = 0:1) +
+  scale_colour_discrete("starting\nproportion")
+```
+
+We classified the trends using the rules below.
+We set the thresholds for trends to $\pm0.1054$, which is equivalent to an odds-ratio of 0.9 and the reference to $0$.
+For the presence of a species we use $25%$ and $75%$ as thresholds and $50%$ as reference.
+
+| Symbol | Trend              | Presence           | Rules                                                                |
+| :----: | ------------------ | ------------------ | -------------------------------------------------------------------- |
+| `++`   | strong increase    | strong presence    | confidence interval above the upper threshold                        |
+| `+`    | increase           | presence           | confidence interval above reference and contains the upper threshold |
+| `+~`   | moderate increase  | moderate presence  | confidence interval between reference and the upper threshold        |
+| `~`    | stable             | tipping point      | confidence interval between thresholds and contains reference        |
+| `-~`   | moderate decrease  | moderate absence   | confidence interval between reference and the lower threshold        |
+| `-`    | decrease           | absence            | confidence interval below reference and contains the lower threshold |
+| `--`   | strong decrease    | strong absence     | confidence interval below the lower threshold                        |
+| `?+`   | potential increase | potential presence | confidence interval contains reference and the upper threshold       |
+| `?-`   | potential decrease | potential absence  | confidence interval contains reference and the lower threshold       |
+| `?`    | unknown            | unknown            | confidence interval contains the lower and upper threshold           |
+
+Table: Summary of the classification into ten categories.
+
+## Compare occurrence of the species with _H. axyridis_ by country
+
+An arrow connects the average of occurrence estimates of two consecutive year.
+The arrow points forward in time.
+
+- arrow points for upper left to lower right: species occurrence decreases when the occurence of _H. axyridis_ increases
+- arrow points for lower left to upper right: species occurrence increases when the occurence of _H. axyridis_ increases
+- arrow points for upper right to lower left: species occurrence decreases when the occurence of _H. axyridis_ decreases
+- arrow points for lower right to upper left: species occurrence increases when the occurence of _H. axyridis_ decreases
+
+```{r trend-compare-be}
+trend %>%
+  filter(species != "Harm_axyr") %>%
+  select(country, species, year, median) %>%
+  inner_join(
+    trend %>%
+      filter(species == "Harm_axyr") %>%
+      select(country, year, ha_median = median),
+    by = c("country", "year")
+  ) %>%
+  group_by(country, species) %>%
+  arrange(year) %>%
+  mutate(
+    ha_median2 = lead(ha_median),
+    median2 = lead(median)
+  ) -> trend_compare
+trend_compare %>%
+  filter(!is.na(ha_median), !is.na(ha_median2), country == "BE") %>%
+  ggplot(
+    aes(
+      x = ha_median, xend = ha_median2, y = median, yend = median2
+    )
+  ) +
+  geom_segment(arrow = arrow(length = unit(1, "mm"))) +
+  scale_x_continuous("occurrence H. axiridis", labels = percent) +
+  scale_y_continuous("occurrence species", labels = percent) +
+  facet_wrap(~species, scales = "free_y") +
+  ggtitle("Belgium")
+```
+
+```{r trend-compare-nl}
+trend_compare %>%
+  filter(!is.na(ha_median), !is.na(ha_median2), country == "NL") %>%
+  ggplot(
+    aes(
+      x = ha_median, xend = ha_median2, y = median, yend = median2
+    )
+  ) +
+  geom_segment(arrow = arrow(length = unit(1, "mm"))) +
+  scale_x_continuous("occurrence H. axiridis", labels = percent) +
+  scale_y_continuous("occurrence species", labels = percent) +
+  facet_wrap(~species, scales = "free_y") +
+  ggtitle("The Netherlands")
+```
+
+```{r species_trends, results = "asis"}
+unique(trend$id) %>%
+  sapply(
+    function(id) {
+      knit_expand("_smoother_trend.Rmd", id = id)
+    }
+  ) %>%
+  paste(collapse = "\n") -> rmd
+knit(text = rmd, quiet = TRUE) %>%
+  cat()
+```
+
+# Spatio-temporal fields
+
+```{r sec-range}
+hyperpar %>%
+  filter(parameter == "Range for site") %>%
+  mutate(
+    species = reorder(species, mean)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = country
+    )
+  ) +
+  geom_vline(xintercept = c(10, 50), linetype = 4) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  scale_x_continuous(limits = c(0, NA)) +
+  ggtitle("Range of the spatio-temporal field in km") +
+  theme(axis.title = element_blank())
+```
+
+```{r sec-stdev}
+hyperpar %>%
+  filter(parameter == "Stdev for site") %>%
+  mutate(
+    species = reorder(species, mean)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = country
+    )
+  ) +
+  geom_vline(xintercept = 0.1, linetype = 4) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  scale_x_continuous(limits = c(0, NA)) +
+  ggtitle("Stdev of the spatio-temporal field") +
+  theme(axis.title = element_blank())
+```
+
+```{r sec-rho}
+hyperpar %>%
+  filter(parameter == "GroupRho for site", !is.na(mean)) %>%
+  mutate(
+    species = reorder(species, mean)
+  ) %>%
+  ggplot(
+    aes(
+      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
+      colour = country
+    )
+  ) +
+  geom_vline(xintercept = 0.6, linetype = 4) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  ggtitle("Rho of the spatio-temporal field in km") +
+  theme(axis.title = element_blank())
+```
+
+# Random walk hyper parameters
+
+```{r sigma-p}
+hyperpar %>%
+  filter(parameter == "Precision for iyear", !is.na(mean)) %>%
+  mutate(
+    species = reorder(species, mean),
+    median = sqrt(1 / `0.5quant`),
+    lcl = sqrt(1 / `0.025quant`),
+    ucl = sqrt(1 / `0.975quant`)
+  ) %>%
+  ggplot(
+    aes(x = median, xmin = lcl, xmax = ucl, y = species, colour = country)
+  ) +
+  geom_vline(xintercept = 0.05, linetype = 4) +
+  geom_errorbarh(position = position_dodge(width = 0.5)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  ggtitle("Stdev for the random walk") +
+  scale_x_continuous(limits = c(0, NA)) +
+  theme(axis.title = element_blank())
+```
