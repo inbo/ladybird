@@ -1,0 +1,226 @@
+```{r {{id}}-subset}
+if (interactive()) {
+  this_id <- sample(trend$id, 1)
+} else {
+  this_id <- "{{id}}"
+}
+trend %>%
+  distinct(id, species, country) %>%
+  filter(id == this_id) -> this
+trend %>%
+  filter(
+    species %in% c(this$species, "Harm_axyr"),
+    country == this$country
+  ) %>%
+  mutate(
+    species = factor(species) %>%
+      relevel("Harm_axyr")
+  ) -> this_trend
+thresholds <- log(0.9) * c(-1, 1)
+lincomb %>%
+  filter(
+    species %in% c(this$species, "Harm_axyr"),
+    country == this$country
+  ) %>%
+  mutate(
+    change = classification(lcl, ucl, thresholds) %>%
+      as.character(),
+    species = factor(species) %>%
+      relevel("Harm_axyr")
+  ) -> this_lincomb
+predictions %>%
+  filter(species == this$species, country == this$country) %>%
+  mutate(
+    presence = classification(lcl, ucl, c(0.25, 0.75), 0.5),
+  ) -> this_predictions
+man_col <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
+man_col[4] <- inbo_steun_blauw
+names(man_col) <- levels(this_predictions$presence)
+```
+
+## `r this$species` in `r this$country`
+
+### Average probability of occurrence
+
+```{r {{id}}-base}
+this_trend %>%
+  ggplot(aes(x = year, y = mean, ymin = lcl, ymax = ucl)) +
+  geom_ribbon(aes(fill = species), alpha = 0.3, linetype = 3) +
+  geom_line(aes(colour = species)) +
+  scale_y_continuous(labels = percent, limits = 0:1) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-trend-compare, eval = this$species != "Harm_axyr"}
+this_trend %>%
+  transmute(
+    species = ifelse(species == "Harm_axyr", "ref", "current"),
+    median, year, lcl, ucl
+  ) %>%
+  pivot_wider(names_from = species, values_from = c(median, lcl, ucl)) %>%
+  arrange(year) %>%
+  mutate(
+    ref2 = lead(median_ref),
+    current2 = lead(median_current)
+  ) -> trend_compare
+trend_compare %>%
+  filter(!is.na(median_ref), !is.na(ref2)) %>%
+  ggplot(
+    aes(
+      x = median_ref, xend = ref2, y = median_current, yend = current2
+    )
+  ) +
+  geom_segment(arrow = arrow(length = unit(3, "mm"))) +
+  scale_x_continuous("occurrence H. axiridis", labels = percent) +
+  scale_y_continuous(paste("occurrence", this$species), labels = percent) +
+  coord_equal()
+```
+
+### Short term linear trends on the logit scale
+
+```{r {{id}}-change}
+this_lincomb %>%
+  filter(species == this$species) %>%
+  ggplot(aes(x = center, y = median, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_ribbon(alpha = 0.3, aes(fill = duration)) +
+  geom_line(aes(colour = duration)) +
+  theme(axis.title = element_blank())
+```
+
+```{r {{id}}-change-ha-02}
+this_lincomb %>%
+  filter(duration == "2") %>%
+  ggplot(aes(x = center, y = median, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_ribbon(alpha = 0.3, aes(fill = species)) +
+  geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
+  geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
+  scale_colour_manual(values = man_col) +
+  theme(axis.title = element_blank()) +
+  ggtitle("2 year trends")
+```
+
+```{r {{id}}-change-ha-05}
+this_lincomb %>%
+  filter(duration == "5") %>%
+  ggplot(aes(x = center, y = median, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_ribbon(alpha = 0.3, aes(fill = species)) +
+  geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
+  geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
+  scale_colour_manual(values = man_col) +
+  theme(axis.title = element_blank()) +
+  ggtitle("5 year trends")
+```
+
+```{r {{id}}-change-ha-10}
+this_lincomb %>%
+  filter(duration == "10") %>%
+  ggplot(aes(x = center, y = median, ymin = lcl, ymax = ucl)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_ribbon(alpha = 0.3, aes(fill = species)) +
+  geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
+  geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
+  scale_colour_manual(values = man_col) +
+  theme(axis.title = element_blank()) +
+  ggtitle("10 year trends")
+```
+
+```{r {{id}}-change-compare, eval = this$species != "Harm_axyr"}
+this_lincomb %>%
+  transmute(
+    species = ifelse(species == "Harm_axyr", "ref", "current"),
+    median, center, duration, lcl, ucl
+  ) %>%
+  pivot_wider(names_from = species, values_from = c(median, lcl, ucl)) %>%
+  arrange(center) %>%
+  group_by(duration) %>%
+  mutate(
+    ref2 = lead(median_ref),
+    current2 = lead(median_current)
+  ) -> lc_compare
+lc_compare %>%
+  filter(!is.na(median_ref), !is.na(ref2)) %>%
+  ggplot(
+    aes(
+      x = median_ref, xend = ref2, y = median_current, yend = current2,
+      colour = duration
+    )
+  ) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_vline(xintercept = thresholds, linetype = 3) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_abline(linetype = 2) +
+  geom_segment(arrow = arrow(length = unit(3, "mm"))) +
+  labs(
+    x = "short term trend H. axiridis",
+    y = paste("short term trend", this_trend$species[1])
+  )
+```
+
+```{r {{id}}-change-compare2, eval = this$species != "Harm_axyr"}
+lc_compare %>%
+  filter(!is.na(median_ref)) %>%
+  ggplot(
+    aes(
+      x = median_ref, xmin = lcl_ref, xmax = ucl_ref, y = median_current, 
+      ymin = lcl_current, ymax = ucl_current, colour = duration
+    )
+  ) +
+  geom_hline(yintercept = thresholds, linetype = 3) +
+  geom_vline(xintercept = thresholds, linetype = 3) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh() +
+  geom_errorbar() +
+  geom_point() +
+  labs(
+    x = "short term trend H. axiridis",
+    y = paste("short term trend", this_trend$species[1])
+  )
+```
+
+## Predicted maps
+
+```{r {{id}}-map}
+ggplot(this_predictions, aes(x = X, y = Y, colour = median)) +
+  geom_point(size = 0.3) +
+  facet_wrap(~year) +
+  coord_equal() +
+  theme_map() +
+  scale_colour_gradientn(colours = traffic_palette(5), limits = 0:1)
+```
+
+```{r {{id}}-map-lcl}
+ggplot(this_predictions, aes(x = X, y = Y, colour = lcl)) +
+  geom_point(size = 0.3) +
+  facet_wrap(~year) +
+  coord_equal() +
+  theme_map() +
+  scale_colour_gradientn(colours = traffic_palette(5), limits = 0:1)
+```
+
+```{r {{id}}-map-ucl}
+ggplot(this_predictions, aes(x = X, y = Y, colour = ucl)) +
+  geom_point(size = 0.3) +
+  facet_wrap(~year) +
+  coord_equal() +
+  theme_map() +
+  scale_colour_gradientn(colours = traffic_palette(5), limits = 0:1)
+```
+
+```{r {{id}}-map-presence}
+ggplot(this_predictions, aes(x = X, y = Y, colour = presence)) +
+  geom_point(size = 0.3) +
+  facet_wrap(~year) +
+  coord_equal() +
+  theme_map() +
+  scale_colour_manual(values = man_col, drop = FALSE)
+```
+

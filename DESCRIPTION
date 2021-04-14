@@ -29,6 +29,7 @@ BugReports: https://github.com/inbo/ladybird/issues
 Imports: 
     INLA,
     assertthat,
+    curl,
     dplyr,
     git2rdata,
     leaflet,
@@ -38,7 +39,8 @@ Imports:
     sf,
     shiny,
     tibble,
-    tidyr
+    tidyr,
+    tidyselect
 Suggests:
     INBOtheme,
     here,
