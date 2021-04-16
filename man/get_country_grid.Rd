@@ -4,7 +4,12 @@
 \alias{get_country_grid}
 \title{Get a grid of points within the country}
 \usage{
-get_country_grid(path = ".", country = c("BE", "NL"), cellsize = 10000)
+get_country_grid(
+  path = ".",
+  country = c("BE", "NL"),
+  cellsize = 10000,
+  what = "polygons"
+)
 }
 \arguments{
 \item{path}{Location of the Natural Earth Data.
@@ -15,6 +20,8 @@ The function will download and unzip the data when not available.}
 \item{cellsize}{Size of the grid cells in meter.
 Must be at least 1000 m.
 Defaults to 10.000 m.}
+
+\item{what}{character; one of: \code{"polygons"}, \code{"corners"}, or \code{"centers"}}
 }
 \description{
 We use the borders from \href{https://www.naturalearthdata.com/}{Natural Earth Data}

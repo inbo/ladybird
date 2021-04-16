@@ -114,7 +114,10 @@ smooth_model <- function(
   base_data %>%
     distinct(.data$year, .data$iyear) %>%
     arrange(.data$year) %>%
-    mutate(intercept = 1) -> trend_prediction
+    mutate(
+      intercept = 1,
+      log_visits = log(4)
+    ) -> trend_prediction
   inla.stack(
     data = data.frame(occurrence = NA),
     A = list(1),
@@ -153,7 +156,10 @@ smooth_model <- function(
   rm(m1)
   gc()
 
-  get_country_grid(path = path, country = country, cellsize = cellsize) %>%
+  get_country_grid(
+    path = path, country = country, cellsize = cellsize, what = "centers"
+  ) %>%
+    st_coordinates() %>%
     as.data.frame() %>%
     mutate(
       X = .data$X / 1e3, Y = .data$Y / 1e3, location = row_number()
@@ -182,7 +188,10 @@ smooth_model <- function(
     location = prediction_grid$location
   ) %>%
     inner_join(prediction_grid, by = "location") %>%
-    mutate(iyear = .data$year - min(.data$year) + 1) -> prediction_grid
+    mutate(
+      iyear = .data$year - min(.data$year) + 1,
+      log_visits = log(4)
+    ) -> prediction_grid
   prediction_grid %>%
     select(.data$X, .data$Y) %>%
     as.matrix() %>%
@@ -254,29 +263,30 @@ moving_trend <- function(n_year = 21, trend_year = 5, first_year = 1991) {
 #' @param cellsize Size of the grid cells in meter.
 #'    Must be at least 1000 m.
 #'    Defaults to 10.000 m.
+#' @inheritParams sf::st_make_grid
 #' @export
 #' @importFrom assertthat assert_that is.number
 #' @importFrom curl curl_download
-#' @importFrom sf read_sf st_coordinates st_intersection st_make_grid
+#' @importFrom sf read_sf st_coordinates st_intersects st_make_grid
 #' st_transform
 #' @importFrom dplyr filter %>%
 #' @importFrom utils unzip
 get_country_grid <- function(
-  path = ".", country = c("BE", "NL"), cellsize = 10e3
+  path = ".", country = c("BE", "NL"), cellsize = 10e3, what = "polygons"
 ) {
   which_country <- match.arg(country)
   path <- normalizePath(path)
   assert_that(is.number(cellsize))
   assert_that(cellsize >= 1e3)
-  if (!file.exists(file.path(path, "ne_10m_admin_0_map_untis.zip"))) {
-    file.path(
-      "https://www.naturalearthdata.com", "http", "",
-      "www.naturalearthdata.com", "download", "10m", "cultural",
-      "ne_10m_admin_0_map_units.zip", fsep = "/"
-    ) %>%
-      curl_download(file.path(path, "ne_10m_admin_0_map_units.zip"))
-  }
   if (!file.exists(file.path(path, "ne_10m_admin_0_map_units.shp"))) {
+    if (!file.exists(file.path(path, "ne_10m_admin_0_map_untis.zip"))) {
+      file.path(
+        "https://www.naturalearthdata.com", "http", "",
+        "www.naturalearthdata.com", "download", "10m", "cultural",
+        "ne_10m_admin_0_map_units.zip", fsep = "/"
+      ) %>%
+        curl_download(file.path(path, "ne_10m_admin_0_map_units.zip"))
+    }
     file.path(path, "ne_10m_admin_0_map_units.zip") %>%
       unzip(exdir = path)
     assert_that(file.exists(file.path(path, "ne_10m_admin_0_map_units.shp")))
@@ -287,10 +297,12 @@ get_country_grid <- function(
     read_sf() %>%
     filter(.data$ADMIN == country_name[which_country], .data$scalerank == 0) %>%
     st_transform(crs = crs[which_country]) -> borders
-  st_make_grid(
-    x = borders, cellsize = cellsize, what = "centers", square = FALSE,
+  hex_grid <- st_make_grid(
+    x = borders, cellsize = cellsize, what = what, square = FALSE,
     flat_topped = TRUE
-  ) %>%
-    st_intersection(borders) %>%
-    st_coordinates()
+  )
+  hex_grid %>%
+    st_intersects(borders, sparse = FALSE) %>%
+    apply(1, any) -> relevant
+  hex_grid[relevant, ]
 }
