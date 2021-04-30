@@ -23,8 +23,12 @@ occurrence_map_ui <- function() {
         label = "minimum number of species per location-year combination"
       ),
       selectInput("select_species", label = "species", choices = ""),
+      selectInput(
+        "country", label = "country", selected = "all",
+        choices = c("all", "BE", "GB", "NL")
+      ),
       sliderInput(
-        "year", min = 1991, max = 2020, step = 1, value = 1991,
+        "year", min = 1990, max = 2020, step = 1, value = 1990,
         label = "year"
       )
     )
@@ -50,7 +54,8 @@ occurrence_map_server <- function(input, output, session) {
     input$min_occurrences, {
       data$occurrences <- load_relevant(
         min_occurrences = input$min_occurrences,
-        min_species = input$min_species
+        min_species = input$min_species,
+        country = input$country
       )
     }
   )
@@ -59,7 +64,18 @@ occurrence_map_server <- function(input, output, session) {
     input$min_species, {
       data$occurrences <- load_relevant(
         min_occurrences = input$min_occurrences,
-        min_species = input$min_species
+        min_species = input$min_species,
+        country = input$country
+      )
+    }
+  )
+
+  observeEvent(
+    input$country, {
+      data$occurrences <- load_relevant(
+        min_occurrences = input$min_occurrences,
+        min_species = input$min_species,
+        country = input$country
       )
     }
   )
