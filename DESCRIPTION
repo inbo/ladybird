@@ -33,6 +33,7 @@ Imports:
     dplyr,
     git2rdata,
     leaflet,
+    magrittr,
     pROC,
     readr,
     rlang,

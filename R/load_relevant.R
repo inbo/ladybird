@@ -5,16 +5,21 @@
 #' @param country Data from which country to select.
 #' @export
 #' @importFrom assertthat assert_that is.count
-#' @importFrom dplyr filter group_by inner_join n transmute ungroup
+#' @importFrom dplyr filter group_by inner_join n transmute ungroup %>%
 #' @importFrom git2rdata read_vc
+#' @importFrom magrittr %<>%
 #' @importFrom tidyr pivot_wider
 load_relevant <- function(
-  min_occurrences = 1000, min_species = 3, country = c("BE", "NL")
+  min_occurrences = 1000, min_species = 3, country = c("BE", "GB", "NL", "all")
 ) {
   assert_that(is.count(min_occurrences), is.count(min_species))
   which_country <- match.arg(country)
-  read_vc("location", system.file(package = "ladybird")) %>%
-    filter(.data$country == which_country) %>%
+  base_data <- read_vc("location", system.file(package = "ladybird"))
+  if (which_country != "all") {
+    base_data %<>%
+      filter(.data$country == which_country)
+  }
+  base_data %>%
     semi_join(
       x = read_vc("occurrence", system.file(package = "ladybird")),
       by = "location"

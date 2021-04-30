@@ -4,7 +4,11 @@
 \alias{load_relevant}
 \title{Load the relevant occurrence data}
 \usage{
-load_relevant(min_occurrences = 1000, min_species = 3, country = c("BE", "NL"))
+load_relevant(
+  min_occurrences = 1000,
+  min_species = 3,
+  country = c("BE", "GB", "NL", "all")
+)
 }
 \arguments{
 \item{min_occurrences}{The minimum number of occurrences per species.}
