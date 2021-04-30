@@ -9,6 +9,8 @@ import_data(
   belgium_visits,
   netherlands_occurrence,
   netherlands_visits,
+  gb_occurrence,
+  gb_visits,
   output,
   strict = TRUE
 )
