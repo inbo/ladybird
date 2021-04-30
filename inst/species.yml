@@ -3,8 +3,8 @@
   optimize: yes
   NA string: NA
   sorting: taxon_key
-  hash: 508250fce8f056a3c419a5c2635711ba4b670da6
-  data_hash: 6e8cf12b96e2fa7abfc95666ef92d9160888214a
+  hash: 19410b18c0c3edf1eb28da6f31469e4628292e20
+  data_hash: 0dcfe96a8023d8832b8b3afc889e419ba7fe0876
 taxon_key:
   class: factor
   labels:
@@ -16,7 +16,6 @@ taxon_key:
   - '1043318'
   - '1043472'
   - '1043495'
-  - '1043717'
   - '4452146'
   - '4452216'
   - '4452221'
@@ -56,7 +55,6 @@ taxon_key:
   - 6
   - 7
   - 8
-  - 38
   - 9
   - 10
   - 11

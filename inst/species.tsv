@@ -7,9 +7,8 @@ taxon_key	scientific_name	code
 6	Subcoccinella vigintiquatuorpunctata	Subc_vigi
 7	Aphidecta obliterata	Aphi_obli
 8	Chilocorus bipustulatus	Chil_bipu
-38	Cryptolaemus montrouzieri	Cryp_mont
 9	Coccinula quatuordecimpustulata	Cocc_quat
-10	Propylea quatuordecimpunctata	Prop_quat
+10	Propylaea quatuordecimpunctata	Prop_quat
 11	Anisosticta novemdecimpunctata	Anis_nove
 37	Adalia conglomerata	Adal_cong
 12	Adalia decempunctata	Adal_dece
@@ -22,7 +21,7 @@ taxon_key	scientific_name	code
 19	Cynegetis impunctata	Cyne_impu
 20	Henosepilachna argus	Heno_argu
 21	Chilocorus renipustulatus	Chil_reni
-22	Exochomus nigromaculatus	Exoc_nigr
+22	Parexochomus nigromaculatus	Pare_nigr
 23	Platynaspis luteorubra	Plat_lute
 24	Harmonia axyridis	Harm_axyr
 25	Coccinella hieroglyphica	Cocc_hier
@@ -35,6 +34,6 @@ taxon_key	scientific_name	code
 31	Coccinella quinquepunctata	Cocc_quin
 32	Coccinella magnifica	Cocc_magn
 33	Oenopia conglobata	Oeno_cong
-34	Exochomus quadripustulatus	Exoc_quad
+34	Brumus quadripustulatus	Brum_quad
 35	Oenopia impustulata	Oeno_impu
 39	Ceratomegilla undecimnotata	Cera_unde
