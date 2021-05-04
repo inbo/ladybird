@@ -8,23 +8,7 @@ trend %>%
   distinct(id, species) %>%
   filter(id == this_id) -> this
 predictions %>%
-  filter(species == this$species) %>%
-  mutate(
-    presence = classification(lcl, ucl, c(0.25, 0.75), 0.5),
-    presence2 = coarse_classification(presence) %>%
-      factor(
-        levels = c("+", "~", "-", "?"),
-        labels = c("50% - 100%", "25% - 75%", "0% - 50%", "0% - 100%")
-      ),
-    presence = factor(
-      presence,
-      levels = c("++", "+", "+~", "~", "-~", "-", "--", "?+", "?-", "?"),
-      labels = c(
-        "75% - 100%", "50% - 100%", "50% - 75%", "25% - 75%",  "25% - 50%",
-        "0% - 50%", "0% - 25%", "25% - 100%", "0% - 75%", "0% - 100%"
-      )
-    )
-  ) -> this_predictions
+  filter(species == this$species) -> this_predictions
 trend %>%
   filter(
     species %in% c(this$species, "Harm_axyr")
@@ -33,12 +17,9 @@ trend %>%
     species = factor(species) %>%
       relevel(this$species)
   ) -> this_trend
-thresholds <- log(0.9) * c(-1, 1)
 lincomb %>%
   filter(species == this$species) %>%
   mutate(
-    change = classification(lcl, ucl, thresholds) %>%
-      as.character(),
     species = factor(species) %>%
       relevel(this$species)
   ) -> this_lincomb
@@ -170,11 +151,11 @@ this_lincomb %>%
   ggtitle(paste("10 year trends", this$species))
 ```
 
-## Predicted maps
+### Predicted maps
 
-### Median of prediction occurrence probability
+#### Median of prediction occurrence probability
 
-```{r {{id}}-map, eval = any(this_predictions$year <= 1997)}
+```{r {{id}}-map, eval = any(this_predictions$year <= 1997), fig.height=3}
 this_predictions %>%
   filter(year <= 1997) %>%
   ggplot(aes(fill = median)) +
@@ -185,7 +166,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-2}
+```{r {{id}}-map-2, fig.height=3}
 this_predictions %>%
   filter(1997 < year, year <= 2005) %>%
   ggplot(aes(fill = median)) +
@@ -196,7 +177,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map3}
+```{r {{id}}-map3, fig.height=3}
 this_predictions %>%
   filter(2005 < year, year <= 2013) %>%
   ggplot(aes(fill = median)) +
@@ -207,7 +188,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map4}
+```{r {{id}}-map4, fig.height=3}
 this_predictions %>%
   filter(2013 < year) %>%
   ggplot(aes(fill = median)) +
@@ -218,9 +199,9 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-### 10 class precence
+#### 10 class precence
 
-```{r {{id}}-map-presence, eval = any(this_predictions$year <= 1997)}
+```{r {{id}}-map-presence, eval = any(this_predictions$year <= 1997), fig.height=3}
 this_predictions %>%
   filter(year <= 1997) %>%
   ggplot(aes(fill = presence)) +
@@ -232,7 +213,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence-2}
+```{r {{id}}-map-presence-2, fig.height=3}
 this_predictions %>%
   filter(1997 < year, year <= 2005) %>%
   ggplot(aes(fill = presence)) +
@@ -244,7 +225,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence-3}
+```{r {{id}}-map-presence-3, fig.height=3}
 this_predictions %>%
   filter(2005 < year, year <= 2013) %>%
   ggplot(aes(fill = presence)) +
@@ -256,7 +237,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence-4}
+```{r {{id}}-map-presence-4, fig.height=3}
 this_predictions %>%
   filter(2013 < year) %>%
   ggplot(aes(fill = presence)) +
@@ -268,9 +249,9 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-### 4 class precence
+#### 4 class precence
 
-```{r {{id}}-map-presence2, eval = any(this_predictions$year <= 1997)}
+```{r {{id}}-map-presence2, eval = any(this_predictions$year <= 1997), fig.height=3}
 this_predictions %>%
   filter(year <= 1997) %>%
   ggplot(aes(fill = presence2)) +
@@ -282,7 +263,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence2-2}
+```{r {{id}}-map-presence2-2, fig.height=3}
 this_predictions %>%
   filter(1997 < year, year <= 2005) %>%
   ggplot(aes(fill = presence2)) +
@@ -294,7 +275,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence2-3}
+```{r {{id}}-map-presence2-3, fig.height=3}
 this_predictions %>%
   filter(2005 < year, year <= 2013) %>%
   ggplot(aes(fill = presence2)) +
@@ -306,7 +287,7 @@ this_predictions %>%
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence2-4}
+```{r {{id}}-map-presence2-4, fig.height=3}
 this_predictions %>%
   filter(2013 < year) %>%
   ggplot(aes(fill = presence2)) +

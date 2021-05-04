@@ -1,20 +1,16 @@
 ---
 title: "Results"
 author: "Thierry Onkelinx"
-date: "8-3-2021"
+date: "2021-05-04"
 output:
   html_document:
     toc: TRUE
     toc_float: TRUE
     number_sections: TRUE
 params:
-  models:
-    label: "Select a base model"
-    value: "../../Analysis/models/smoother/harm_axyr_1000_3.rds"
-    input: file
-  maps:
-    label: "Select the country map"
-    value: "../../Analysis/shape/ne_10m_admin_0_map_units.shp"
+  results:
+    label: "Select the results file"
+    value: "../../Analysis/smoothers.Rdata"
     input: file
 references:
 - id: LindgrenRue2015
@@ -64,110 +60,15 @@ references:
 library(knitr)
 opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE)
 options(knitr.kable.NA = '')
-library(git2rdata)
-library(INLA)
 library(tidyverse)
-library(plotly)
 library(scales)
 library(INBOtheme)
-library(effectclass)
 library(sf)
 library(ladybird)
 ```
 
 ```{r load-models, results = "hide"}
-dirname(params$models) %>%
-  list.files(full.names = TRUE, recursive = TRUE) %>%
-  map(readRDS) -> base_models
-species <- map_chr(base_models, "species")
-waic <- map_dbl(base_models, "waic")
-country <- map_chr(base_models, "country")
-map(base_models, "hyperpar") %>%
-  map(rownames_to_column, var = "parameter") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() -> hyperpar
-map(base_models, "fixed") %>%
-  map(rownames_to_column, var = "parameter") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() -> fixed
-map(base_models, "trend") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() %>%
-  arrange(species, country) %>%
-  mutate(
-    id = str_replace_all(species, "_", "-")
-  ) -> trend
-map(base_models, "roc") %>%
-  map("ci") %>%
-  map(
-    ~data.frame(parameter = c("lcl", "estimate", "ucl"), auc = as.vector(.x))
-  ) %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() -> auc
-map(base_models, "field") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() -> field
-map(base_models, "lincomb") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() %>%
-  mutate(duration = factor(duration)) -> lincomb
-map(base_models, "prediction") %>%
-  map2(species, ~mutate(.x, species = .y)) %>%
-  map2(country, ~mutate(.x, country = .y)) %>%
-  bind_rows() %>%
-  mutate(
-    X = round(X, 1),
-    Y = round(Y, 1)
-  ) -> predictions
-get_country_grid(
-  path = dirname(params$maps), country = "BE", cellsize = 10e3,
-  what = "polygons"
-) %>%
-  st_as_sf() %>%
-  bind_cols(
-    st_centroid(.) %>%
-      st_coordinates() %>%
-      as.data.frame()
-  ) %>%
-  st_transform(crs = 4326) %>%
-  bind_rows(
-    get_country_grid(
-      path = dirname(params$maps), country = "NL", cellsize = 10e3,
-      what = "polygons"
-    ) %>%
-    st_as_sf() %>%
-    bind_cols(
-      st_centroid(.) %>%
-        st_coordinates() %>%
-        as.data.frame()
-    ) %>%
-    st_transform(crs = 4326),
-    get_country_grid(
-      path = dirname(params$maps), country = "GB", cellsize = 15e3,
-      what = "polygons"
-    ) %>%
-    st_as_sf() %>%
-    bind_cols(
-      st_centroid(.) %>%
-        st_coordinates() %>%
-        as.data.frame()
-    ) %>%
-    st_transform(crs = 4326)
-  ) %>%
-  mutate(
-    X = round(X, 1),
-    Y = round(Y, 1)
-  ) -> hex_grid
-hex_grid %>%
-  inner_join(predictions, by = c("X", "Y")) -> predictions
-rm(base_models)
-gc()
+load(params$results)
 ```
 
 # Data selection
@@ -263,7 +164,7 @@ $C(\Delta_{xy})$ is defined as below with
 
 $$C(\Delta_{xy}) = \frac{1}{\Gamma(\lambda) 2 ^{\lambda - 1}} (\kappa \Delta_{xy}) ^\lambda K_\lambda (\kappa \Delta_{xy})$$
 We combined the $\lambda$ and $\kappa$ parameters into a single $r$ parameter.
-This is the range of the spatial autocorrelation: the distance at which the correlation between two location location drops below $0.1$.
+This is the range of the spatial autocorrelation: the distance at which the correlation between two location drops below $0.1$.
 We set a penalised complexity prior for the range: $P(r < 50km) = 0.5$ [@SorbyeRue2016].
 
 $$r = \frac{\sqrt{8\lambda}}{\kappa}$$
@@ -283,131 +184,19 @@ We choose to generate meshes with edges of 10 km for Belgium and the Netherlands
 We created the mesh with the 50 km buffer around the locations with sufficient data density.
 
 ```{r belgian-mesh, fig.cap = "Mesh for the Belgian data."}
-load_relevant(
-  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
-  buffer_locations = 50, country = "BE"
-) %>%
-  filter(buffer_count >= 50) %>%
-  semi_join(
-    x = read_vc("location", system.file(package = "ladybird")),
-    by = "location"
-  ) %>%
-  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-  st_transform(crs = 31370) %>%
-  st_buffer(50e3) %>%
-  st_union() %>%
-  st_buffer(50e3) %>%
-  st_buffer(-50e3) -> closing
-inla.mesh.2d(
-  boundary = as_Spatial(closing), max.edge = 10e3, cutoff = 5e3
-) -> mesh
-apply(
-  mesh$graph$tv[, 1:2], 1, function(x) {
-    list(st_linestring(mesh$loc[x, ]))
-  }
-) %>%
-  c(
-    apply(
-      mesh$graph$tv[, 2:3], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    ),
-    apply(
-      mesh$graph$tv[, c(1, 3)], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    )
-  ) %>%
-  unlist(recursive = FALSE) %>%
-  st_as_sfc(crs = 31370) -> segments
-border <- get_country_grid(dirname(params$maps), "BE", what = "borders")
-ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf()
+ggplot(be_segment) + geom_sf(data = be_border, fill = inbo_hoofd) + geom_sf()
 ```
 
 ```{r dutch-mesh, fig.cap = "Mesh for the Dutch data."}
-load_relevant(
-  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
-  buffer_locations = 50, country = "NL"
-) %>%
-  filter(buffer_count >= 50) %>%
-  semi_join(
-    x = read_vc("location", system.file(package = "ladybird")),
-    by = "location"
-  ) %>%
-  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-  st_transform(crs = 28992) %>%
-  st_buffer(50e3) %>%
-  st_union() %>%
-  st_buffer(50e3) %>%
-  st_buffer(-50e3) -> closing
-inla.mesh.2d(
-  boundary = as_Spatial(closing), max.edge = 10e3, cutoff = 5e3
-) -> mesh
-apply(
-  mesh$graph$tv[, 1:2], 1, function(x) {
-    list(st_linestring(mesh$loc[x, ]))
-  }
-) %>%
-  c(
-    apply(
-      mesh$graph$tv[, 2:3], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    ),
-    apply(
-      mesh$graph$tv[, c(1, 3)], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    )
-  ) %>%
-  unlist(recursive = FALSE) %>%
-  st_as_sfc(crs = 28992) -> segments
-border <- get_country_grid(dirname(params$maps), "NL", what = "borders")
-ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf()
+ggplot(nl_segment) + geom_sf(data = nl_border, fill = inbo_hoofd) + geom_sf()
 ```
 
 ```{r great-britain-mesh, fig.cap = "Mesh for the British data."}
-load_relevant(
-  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
-  buffer_locations = 50, country = "GB"
-) %>%
-  filter(buffer_count >= 50) %>%
-  semi_join(
-    x = read_vc("location", system.file(package = "ladybird")),
-    by = "location"
-  ) %>%
-  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-  st_transform(crs = 27700) %>%
-  st_buffer(50e3) %>%
-  st_union() %>%
-  st_buffer(50e3) %>%
-  st_buffer(-50e3) -> closing
-inla.mesh.2d(
-  boundary = as_Spatial(closing), max.edge = 15e3, cutoff = 5e3
-) -> mesh
-apply(
-  mesh$graph$tv[, 1:2], 1, function(x) {
-    list(st_linestring(mesh$loc[x, ]))
-  }
-) %>%
-  c(
-    apply(
-      mesh$graph$tv[, 2:3], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    ),
-    apply(
-      mesh$graph$tv[, c(1, 3)], 1, function(x) {
-        list(st_linestring(mesh$loc[x, ]))
-      }
-    )
-  ) %>%
-  unlist(recursive = FALSE) %>%
-  st_as_sfc(crs = 27700) -> segments
-border <- get_country_grid(dirname(params$maps), "GB", what = "borders")
-
-ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf() +
-  coord_sf(xlim = st_bbox(segments)[c(1, 3)], ylim = st_bbox(segments)[c(2, 4)])
+ggplot(gb_segment) + geom_sf(data = gb_border, fill = inbo_hoofd) +
+  geom_sf() +
+  coord_sf(
+    xlim = st_bbox(gb_segment)[c(1, 3)], ylim = st_bbox(gb_segment)[c(2, 4)]
+  )
 ```
 
 # Comparing fits
@@ -415,9 +204,7 @@ ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf() +
 ```{r auc, fig.cap = "Area under the curve. Higher is better."}
 auc %>%
   pivot_wider(names_from = parameter, values_from = auc) %>%
-  mutate(
-    species = reorder(species, estimate),
-  ) %>%
+  mutate(species = reorder(species, estimate)) %>%
   ggplot(
     aes(
       x = estimate, xmin = lcl, xmax = ucl, y = species, colour = country
@@ -436,9 +223,7 @@ auc %>%
 ```{r logvisit, fig.cap = "Parameter estimates for log number of days."}
 fixed %>%
   filter(parameter == "log_visits") %>%
-  mutate(
-    species = reorder(species, mean)
-  ) %>%
+  mutate(species = reorder(species, mean)) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
@@ -690,9 +475,7 @@ hyperpar %>%
 ```{r sec-range}
 hyperpar %>%
   filter(parameter == "Range for site") %>%
-  mutate(
-    species = reorder(species, mean)
-  ) %>%
+  mutate(species = reorder(species, mean)) %>%
   ggplot(
     aes(
       x = mean / 1e3, xmin = `0.025quant` / 1e3, xmax = `0.975quant` / 1e3,
@@ -710,9 +493,7 @@ hyperpar %>%
 ```{r sec-stdev}
 hyperpar %>%
   filter(parameter == "Stdev for site") %>%
-  mutate(
-    species = reorder(species, mean)
-  ) %>%
+  mutate(species = reorder(species, mean)) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
@@ -730,9 +511,7 @@ hyperpar %>%
 ```{r sec-rho}
 hyperpar %>%
   filter(parameter == "GroupRho for site", !is.na(mean)) %>%
-  mutate(
-    species = reorder(species, mean)
-  ) %>%
+  mutate(species = reorder(species, mean)) %>%
   ggplot(
     aes(
       x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
