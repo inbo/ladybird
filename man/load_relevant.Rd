@@ -7,7 +7,9 @@
 load_relevant(
   min_occurrences = 1000,
   min_species = 3,
-  country = c("BE", "GB", "NL", "all")
+  country = c("BE", "GB", "NL", "all"),
+  buffer_distance = 50000,
+  buffer_locations = 50
 )
 }
 \arguments{
@@ -17,6 +19,11 @@ load_relevant(
 of location and year.}
 
 \item{country}{Data from which country to select.}
+
+\item{buffer_distance}{The range in which to look for other locations.}
+
+\item{buffer_locations}{The minimal number of locations with suffient data
+within the buffer range}
 }
 \description{
 Load the relevant occurrence data

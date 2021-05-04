@@ -7,19 +7,27 @@
 #' @importFrom dplyr arrange bind_cols bind_rows distinct inner_join mutate
 #' select starts_with row_number %>%
 #' @importFrom git2rdata read_vc
+#' @importFrom magrittr %<>%
 #' @importFrom rlang .data !!
-#' @importFrom sf st_as_sf st_coordinates st_drop_geometry st_transform
+#' @importFrom sf as_Spatial st_area st_as_sf st_buffer st_coordinates st_crs
+#' st_distance st_drop_geometry st_intersection st_transform st_union
 #' @importFrom stats setNames
 #' @importFrom tidyr complete extract
+#' @importFrom units as_units
 #' @importFrom utils head
 smooth_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
-  country = c("BE", "NL"), path = ".", cellsize = 10e3
+  country = c("BE", "GB", "NL", "all"), path = ".", cellsize = 10e3,
+  buffer_distance = 50e3, buffer_locations = 50
 ) {
   which_country <- match.arg(country)
-  crs <- c(BE = 31370, NL = 28992)
-  read_vc("location", system.file(package = "ladybird")) %>%
-    filter(.data$country == which_country) %>%
+  crs <- c(BE = 31370, GB = 27700, NL = 28992, all = 3035)
+  base_loc <- read_vc("location", system.file(package = "ladybird"))
+  if (which_country != "all") {
+    base_loc %<>%
+      filter(.data$country == which_country)
+  }
+  base_loc %>%
     st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
     st_transform(crs = crs[which_country]) -> base_loc
   base_loc %>%
@@ -27,32 +35,40 @@ smooth_model <- function(
       st_coordinates(base_loc) %>%
         as.data.frame()
     ) %>%
-    st_drop_geometry() %>%
     inner_join(
       load_relevant(
         min_occurrences = min_occurrences, min_species = min_species,
-        country = which_country
+        country = which_country, buffer_distance = buffer_distance,
+        buffer_locations = buffer_locations
       ),
       by = "location"
     ) %>%
     select(
       .data$year, .data$location, .data$X, .data$Y, .data$visits,
-      occurrence = !!species
+      .data$buffer_count, occurrence = !!species
     ) %>%
     filter(.data$year >= min(.data$year[.data$occurrence == 1]) - 1) %>%
     mutate(
-      X = .data$X / 1e3, Y = .data$Y / 1e3, log_visits = log(.data$visits),
+      log_visits = log(.data$visits),
       iyear = .data$year - min(.data$year) + 1
     ) -> base_data
-
+  base_data %>%
+    filter(.data$buffer_count >= buffer_locations) %>%
+    st_buffer(buffer_distance) %>%
+    st_union() -> base_buffer
+  base_buffer %>%
+    st_buffer(buffer_distance) %>%
+    st_buffer(-buffer_distance) %>%
+    as_Spatial() -> mesh_buffer
   time_mesh <- inla.mesh.1d(loc = pretty(base_data$year, 3))
   inla.mesh.2d(
-    loc.domain = distinct(base_data, .data$X, .data$Y),
-    max.edge = 10
+    boundary = mesh_buffer, max.edge = cellsize, cutoff = cellsize / 2
   ) -> mesh
   spde <- inla.spde2.pcmatern(
-    mesh = mesh, prior.range = c(50, 0.5), prior.sigma = c(0.1, 0.05)
+    mesh = mesh, prior.range = c(50e3, 0.5), prior.sigma = c(0.1, 0.05)
   )
+  base_data %<>%
+    st_drop_geometry()
   base_data %>%
     select(.data$X, .data$Y) %>%
     as.matrix() %>%
@@ -159,10 +175,11 @@ smooth_model <- function(
   get_country_grid(
     path = path, country = country, cellsize = cellsize, what = "centers"
   ) %>%
+    st_intersection(base_buffer) %>%
     st_coordinates() %>%
     as.data.frame() %>%
     mutate(
-      X = .data$X / 1e3, Y = .data$Y / 1e3, location = row_number()
+      location = row_number()
     ) -> prediction_grid
   expand.grid(
     year = time_mesh$loc,
@@ -267,17 +284,19 @@ moving_trend <- function(n_year = 21, trend_year = 5, first_year = 1991) {
 #' @export
 #' @importFrom assertthat assert_that is.number
 #' @importFrom curl curl_download
-#' @importFrom sf read_sf st_coordinates st_intersects st_make_grid
-#' st_transform
+#' @importFrom sf read_sf st_cast st_coordinates st_intersects st_make_grid
+#' st_transform st_union
 #' @importFrom dplyr filter %>%
 #' @importFrom utils unzip
 get_country_grid <- function(
-  path = ".", country = c("BE", "NL"), cellsize = 10e3, what = "polygons"
+  path = ".", country = c("BE", "GB", "NL", "all"), cellsize = 10e3,
+  what = "polygons"
 ) {
   which_country <- match.arg(country)
   path <- normalizePath(path)
   assert_that(is.number(cellsize))
   assert_that(cellsize >= 1e3)
+  assert_that(is.string(what))
   if (!file.exists(file.path(path, "ne_10m_admin_0_map_units.shp"))) {
     if (!file.exists(file.path(path, "ne_10m_admin_0_map_untis.zip"))) {
       file.path(
@@ -291,12 +310,20 @@ get_country_grid <- function(
       unzip(exdir = path)
     assert_that(file.exists(file.path(path, "ne_10m_admin_0_map_units.shp")))
   }
-  crs <- c(BE = 31370, NL = 28992, UK = 27700)
-  country_name <- c(BE = "Belgium", NL = "Netherlands", UK = "United Kingdom")
+  crs <- c(BE = 31370, NL = 28992, GB = 27700, all = 3035)
+  country_name <- c(BE = "Belgium", NL = "Netherlands", GB = "United Kingdom")
   file.path(path, "ne_10m_admin_0_map_units.shp") %>%
     read_sf() %>%
-    filter(.data$ADMIN == country_name[which_country], .data$scalerank == 0) %>%
-    st_transform(crs = crs[which_country]) -> borders
+    filter(
+      .data$ADMIN == country_name[which_country], .data$scalerank == 0,
+      .data$GEOUNIT != "Northern Ireland"
+    ) %>%
+    st_transform(crs = crs[which_country]) %>%
+    st_union() %>%
+    st_cast("POLYGON") -> borders
+  if (what == "borders") {
+    return(borders)
+  }
   hex_grid <- st_make_grid(
     x = borders, cellsize = cellsize, what = what, square = FALSE,
     flat_topped = TRUE

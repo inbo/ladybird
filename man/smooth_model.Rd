@@ -8,9 +8,11 @@ smooth_model(
   species = "Harm_axyr",
   min_occurrences = 1000,
   min_species = 3,
-  country = c("BE", "NL"),
+  country = c("BE", "GB", "NL", "all"),
   path = ".",
-  cellsize = 10000
+  cellsize = 10000,
+  buffer_distance = 50000,
+  buffer_locations = 50
 )
 }
 \arguments{
@@ -29,6 +31,11 @@ The function will download and unzip the data when not available.}
 \item{cellsize}{Size of the grid cells in meter.
 Must be at least 1000 m.
 Defaults to 10.000 m.}
+
+\item{buffer_distance}{The range in which to look for other locations.}
+
+\item{buffer_locations}{The minimal number of locations with suffient data
+within the buffer range}
 }
 \description{
 Fit a base model to a species

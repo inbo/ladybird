@@ -6,7 +6,7 @@
 \usage{
 get_country_grid(
   path = ".",
-  country = c("BE", "NL"),
+  country = c("BE", "GB", "NL", "all"),
   cellsize = 10000,
   what = "polygons"
 )
