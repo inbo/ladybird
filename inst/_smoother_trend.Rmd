@@ -7,6 +7,24 @@ if (interactive()) {
 trend %>%
   distinct(id, species) %>%
   filter(id == this_id) -> this
+predictions %>%
+  filter(species == this$species) %>%
+  mutate(
+    presence = classification(lcl, ucl, c(0.25, 0.75), 0.5),
+    presence2 = coarse_classification(presence) %>%
+      factor(
+        levels = c("+", "~", "-", "?"),
+        labels = c("50% - 100%", "25% - 75%", "0% - 50%", "0% - 100%")
+      ),
+    presence = factor(
+      presence,
+      levels = c("++", "+", "+~", "~", "-~", "-", "--", "?+", "?-", "?"),
+      labels = c(
+        "75% - 100%", "50% - 100%", "50% - 75%", "25% - 75%",  "25% - 50%",
+        "0% - 50%", "0% - 25%", "25% - 100%", "0% - 75%", "0% - 100%"
+      )
+    )
+  ) -> this_predictions
 trend %>%
   filter(
     species %in% c(this$species, "Harm_axyr")
@@ -24,12 +42,9 @@ lincomb %>%
     species = factor(species) %>%
       relevel(this$species)
   ) -> this_lincomb
-predictions %>%
-  filter(species == this$species) %>%
-  mutate(
-    presence = classification(lcl, ucl, c(0.25, 0.75), 0.5),
-    presence2 = coarse_classification(presence)
-  ) -> this_predictions
+man_colt <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
+man_colt[4] <- inbo_steun_blauw
+names(man_colt) <- levels(this_lincomb$change)
 man_col <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
 man_col[4] <- inbo_steun_blauw
 names(man_col) <- levels(this_predictions$presence)
@@ -78,10 +93,10 @@ trend_compare %>%
       colour = country
     )
   ) +
+  geom_abline(linetype = 2) +
   geom_segment(arrow = arrow(length = unit(2, "mm"))) +
   scale_x_continuous("occurrence H. axiridis", labels = percent) +
-  scale_y_continuous(paste("occurrence", this$species), labels = percent) +
-  coord_equal()
+  scale_y_continuous(paste("occurrence", this$species), labels = percent)
 ```
 
 ### Short term linear trends
@@ -110,12 +125,13 @@ this_lincomb %>%
   geom_ribbon(alpha = 0.3, aes(fill = country)) +
   geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
   geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
-  scale_colour_manual(values = man_col) +
+  scale_colour_manual(values = man_colt) +
   scale_y_continuous(
     "trend on logit scale",
     sec.axis = sec_axis(exp, "odds ratio")
   ) +
-  ggtitle("2 year trends")
+  theme(axis.title.x = element_blank()) +
+  ggtitle(paste("2 year trends", this$species))
 ```
 
 ```{r {{id}}-change-ha-05}
@@ -127,12 +143,13 @@ this_lincomb %>%
   geom_ribbon(alpha = 0.3, aes(fill = country)) +
   geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
   geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
-  scale_colour_manual(values = man_col) +
+  scale_colour_manual(values = man_colt) +
   scale_y_continuous(
     "trend on logit scale",
     sec.axis = sec_axis(exp, "odds ratio")
   ) +
-  ggtitle("5 year trends")
+  theme(axis.title.x = element_blank()) +
+  ggtitle(paste("5 year trends", this$species))
 ```
 
 ```{r {{id}}-change-ha-10}
@@ -144,41 +161,159 @@ this_lincomb %>%
   geom_ribbon(alpha = 0.3, aes(fill = country)) +
   geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
   geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
-  scale_colour_manual(values = man_col) +
+  scale_colour_manual(values = man_colt) +
   scale_y_continuous(
     "trend on logit scale",
     sec.axis = sec_axis(exp, "odds ratio")
   ) +
-  ggtitle("10 year trends")
+  theme(axis.title.x = element_blank()) +
+  ggtitle(paste("10 year trends", this$species))
 ```
 
 ## Predicted maps
 
-```{r {{id}}-map}
-ggplot(this_predictions, aes(fill = median)) +
+### Median of prediction occurrence probability
+
+```{r {{id}}-map, eval = any(this_predictions$year <= 1997)}
+this_predictions %>%
+  filter(year <= 1997) %>%
+  ggplot(aes(fill = median)) +
   geom_sf(colour = NA) +
-  facet_wrap(~year) +
+  facet_wrap(~year, nrow = 2) +
   theme_map() +
   scale_fill_gradientn(colours = traffic_palette(5), limits = 0:1) +
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence}
-ggplot(this_predictions, aes(fill = presence)) +
+```{r {{id}}-map-2}
+this_predictions %>%
+  filter(1997 < year, year <= 2005) %>%
+  ggplot(aes(fill = median)) +
   geom_sf(colour = NA) +
-  facet_wrap(~year) +
+  facet_wrap(~year, nrow = 2) +
   theme_map() +
-  scale_fill_manual(values = man_col, drop = FALSE) +
-  ggtitle("10 class presence") +
+  scale_fill_gradientn(colours = traffic_palette(5), limits = 0:1) +
   theme(strip.text = element_text(size = rel(0.5)))
 ```
 
-```{r {{id}}-map-presence2}
-ggplot(this_predictions, aes(fill = presence2)) +
+```{r {{id}}-map3}
+this_predictions %>%
+  filter(2005 < year, year <= 2013) %>%
+  ggplot(aes(fill = median)) +
   geom_sf(colour = NA) +
-  facet_wrap(~year) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_gradientn(colours = traffic_palette(5), limits = 0:1) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map4}
+this_predictions %>%
+  filter(2013 < year) %>%
+  ggplot(aes(fill = median)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_gradientn(colours = traffic_palette(5), limits = 0:1) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+### 10 class precence
+
+```{r {{id}}-map-presence, eval = any(this_predictions$year <= 1997)}
+this_predictions %>%
+  filter(year <= 1997) %>%
+  ggplot(aes(fill = presence)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual(values = man_col, drop = FALSE) +
+  ggtitle(paste("10 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence-2}
+this_predictions %>%
+  filter(1997 < year, year <= 2005) %>%
+  ggplot(aes(fill = presence)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual(values = man_col, drop = FALSE) +
+  ggtitle(paste("10 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence-3}
+this_predictions %>%
+  filter(2005 < year, year <= 2013) %>%
+  ggplot(aes(fill = presence)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual(values = man_col, drop = FALSE) +
+  ggtitle(paste("10 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence-4}
+this_predictions %>%
+  filter(2013 < year) %>%
+  ggplot(aes(fill = presence)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual(values = man_col, drop = FALSE) +
+  ggtitle(paste("10 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+### 4 class precence
+
+```{r {{id}}-map-presence2, eval = any(this_predictions$year <= 1997)}
+this_predictions %>%
+  filter(year <= 1997) %>%
+  ggplot(aes(fill = presence2)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
   theme_map() +
   scale_fill_manual("presence", values = man_col2, drop = FALSE) +
-  ggtitle("4 class presence") +
+  ggtitle(paste("4 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence2-2}
+this_predictions %>%
+  filter(1997 < year, year <= 2005) %>%
+  ggplot(aes(fill = presence2)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual("presence", values = man_col2, drop = FALSE) +
+  ggtitle(paste("4 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence2-3}
+this_predictions %>%
+  filter(2005 < year, year <= 2013) %>%
+  ggplot(aes(fill = presence2)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual("presence", values = man_col2, drop = FALSE) +
+  ggtitle(paste("4 class presence", this$species)) +
+  theme(strip.text = element_text(size = rel(0.5)))
+```
+
+```{r {{id}}-map-presence2-4}
+this_predictions %>%
+  filter(2013 < year) %>%
+  ggplot(aes(fill = presence2)) +
+  geom_sf(colour = NA) +
+  facet_wrap(~year, nrow = 2) +
+  theme_map() +
+  scale_fill_manual("presence", values = man_col2, drop = FALSE) +
+  ggtitle(paste("4 class presence", this$species)) +
   theme(strip.text = element_text(size = rel(0.5)))
 ```

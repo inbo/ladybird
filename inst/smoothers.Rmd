@@ -2,7 +2,11 @@
 title: "Results"
 author: "Thierry Onkelinx"
 date: "8-3-2021"
-output: html_document
+output:
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
 params:
   models:
     label: "Select a base model"
@@ -12,19 +16,63 @@ params:
     label: "Select the country map"
     value: "../../Analysis/shape/ne_10m_admin_0_map_units.shp"
     input: file
+references:
+- id: LindgrenRue2015
+  title: Bayesian Spatial Modelling with R-INLA
+  author:
+  - family: Lindgren
+    given: Finn
+  - family: Rue
+    given: Håvard
+  container-title: Journal of Statistical Software
+  volume: 63
+  issue: 19
+  page: 1-25
+  URL: "https://www.jstatsoft.org/v63/i19/"
+  DOI: 10.18637/jss.v063.i19
+  publisher: Foundation for Open Access Statistics
+  type: article-journal
+  issued:
+    year: 2015
+- id: SorbyeRue2016
+  type: article-journal
+  author:
+  - family: Sørbye
+    given: Sigrunn
+  - family: Rue
+    given: Håvard
+  issued:
+    year: 2016
+    month: 08
+  title: Penalised Complexity Priors for Stationary Autoregressive Processes
+  volume : 38
+  container-title: Journal of Time Series Analysis
+  DOI: 10.1111/jtsa.12242
+- id: R2021
+  title: "R: A Language and Environment for Statistical Computing"
+  author: R Core team
+  container-title: Journal of Statistical Software
+  URL: "https://www.R-project.org/"
+  publisher: R Foundation for Statistical Computing
+  type: article-journal
+  address: Vienna, Austria
+  issued:
+    year: 2021
 ---
 
 ```{r setup, include=FALSE}
 library(knitr)
 opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE)
 options(knitr.kable.NA = '')
-library(ladybird)
+library(git2rdata)
+library(INLA)
 library(tidyverse)
 library(plotly)
 library(scales)
 library(INBOtheme)
 library(effectclass)
 library(sf)
+library(ladybird)
 ```
 
 ```{r load-models, results = "hide"}
@@ -99,11 +147,22 @@ get_country_grid(
         st_coordinates() %>%
         as.data.frame()
     ) %>%
+    st_transform(crs = 4326),
+    get_country_grid(
+      path = dirname(params$maps), country = "GB", cellsize = 15e3,
+      what = "polygons"
+    ) %>%
+    st_as_sf() %>%
+    bind_cols(
+      st_centroid(.) %>%
+        st_coordinates() %>%
+        as.data.frame()
+    ) %>%
     st_transform(crs = 4326)
   ) %>%
   mutate(
-    X = round(X / 1000, 1),
-    Y = round(Y / 1000, 1)
+    X = round(X, 1),
+    Y = round(Y, 1)
   ) -> hex_grid
 hex_grid %>%
   inner_join(predictions, by = c("X", "Y")) -> predictions
@@ -125,7 +184,19 @@ This leads to instable models, due to numerical problems.
 To fix this, we determine the year with the first recorded occurrence for every species.
 Them we remove for that species all year prior to the year before the first recorded occurrence.
 
+The data is too sparse in some regions (e.g. Scotland outside the Edinburgh - Glasgow area, northern England, Channel Islands, Isle of Man, ...) to fit a stable model.
+We determine the data abundance for each location by counting the number of locations with sufficient data in a 50 km radius.
+Next we create of 50 km buffer around the locations with data abundance of at least 50.
+This is equivalent to requiring an average data density of about 0.6 relevant locations per 100 km^2^.
+We keep all relevant location within this 50 km buffer, regardless their individual data density.
+This rule has no impact on the Belgian and Dutch data.
+
 # Model
+
+We fit the Bayesian models with the INLA package [@LindgrenRue2015] in [@R2021].
+INLA stands for Integrated Nested Laplace Approximation which is a faster alternative for Markov chain Monte Carlo (MCMC).
+
+## Global structure
 
 Let $Y_{tx}$ be the occurrence of a species in year $t$ at square $x$.
 $Y_{tx} = 1$ when we have at least one record of the species in year $t$ at square $x$.
@@ -142,10 +213,12 @@ The linear predictor consists of four components.
 
 - $\beta_0$: the overall average with prior $\mathcal{N}(0, 1000)$.
 - $E_{tx}$: the monitoring effort.
-- $b_t$: a second order random walk along $t$, modelling deviations from the linear trend per decade.
-- $\omega_{tx}$: Gaussian Markov Random Field (GMRF) with temporal correlation, modelling the residual spatio-temporal autocorrelation.
+- $b_t$: a second order random walk along $t$, modelling the overall temporal trend.
+- $\omega_{tx}$: Gaussian Markov Random Field (GMRF) with temporal correlation, modelling the spatio-temporal autocorrelation.
 
 $$\eta_{tx} = \beta_0 + E_{tx} + b_t + \omega_{tx}$$
+
+## Monitoring effect
 
 We base the monitoring effect on the unique number of days with recordings $d_{tx}$ in year $t$ at square $x$.
 We use the $\log$ number of days due to the $\mbox{logit}$ transformation.
@@ -154,31 +227,36 @@ $\beta_d$ gets $\mathcal{N}(0, 1000)$ as prior.
 
 $$E_{tx} = \beta_d \log d_{tx}$$
 
+## Overall temporal trend
+
 The second order random walk models the average change over time.
 A first order random walk models the difference between consecutive years.
 A second order random models the difference between consecutive first order differences.
 The random steps follow a Gaussian distribution with mean $0$ and variance $\sigma^2_r$.
-We set a penalised complexity prior: $P(\sigma_r > 0.05) = 0.01$.
+We set a penalised complexity prior for the precision: $P(\sigma_r > 0.05) = 0.01$ [@SorbyeRue2016].
 This favours smaller values for $\sigma_r$.
 The wiggliness of the smoother depends on the value of $\sigma_r$.
 When $\sigma_r = 0$, the resulting smoother is a straight line.
 
 $$(b_{t + 1} - b_t) - (b_t - b_{t - 1}) \sim \mathcal{N}(0, \sigma^2_r)$$
 
+## Spatio-temporal autocorrelation
+
 We model the spatio-temporal autocorrelation $\omega_{tx}$ as an AR-1 correlation between Gaussian Markhov Random Fields (GMRF) $\xi_{tx}$.
 $\rho$ is temporal autocorrelation between two consecutive GMRF's.
-We set a penalised complexity prior: $P(\rho > 0.6) = 0.7$.
+We set a penalised complexity prior for the correlation: $P(\rho > 0.6) = 0.7$ [@SorbyeRue2016].
 
 $$\omega_{tx} = \rho\omega_{t-1x} + \xi_{tx}$$
 
 The individual GRMF $\xi_{tx}$ are independent but share the $r$ and $\sigma^2_s$ parameters.
 $\sigma^2_s$ is variance of the GMRF at distances larger than $r$.
 While $C(\Delta_{xy})$ the distance based correlation between locations $x$ and $y$, with $\Delta_{xy}$ being the distance between locations $x$ and $y$.
-We set a penalised complexity prior: $P(\sigma_s > 0.1) = 0.05$.
+We set a penalised complexity prior for the precision: $P(\sigma_s > 0.1) = 0.05$ [@SorbyeRue2016].
 
 $$\xi_x \sim \mathcal{N}(0, \sigma^2_sC(\Delta_{xy}))$$
 
 $C(\Delta_{xy})$ is defined as below with 
+
 - $K_\lambda$: modified Bessel function of the second kind;
 - $\lambda > 0$: parameter defining the smoothness of the GMRF;
 - $\kappa > 0$: scaling parameter
@@ -186,9 +264,151 @@ $C(\Delta_{xy})$ is defined as below with
 $$C(\Delta_{xy}) = \frac{1}{\Gamma(\lambda) 2 ^{\lambda - 1}} (\kappa \Delta_{xy}) ^\lambda K_\lambda (\kappa \Delta_{xy})$$
 We combined the $\lambda$ and $\kappa$ parameters into a single $r$ parameter.
 This is the range of the spatial autocorrelation: the distance at which the correlation between two location location drops below $0.1$.
-We set a penalised complexity prior: $P(r < 50) = 0.5$.
+We set a penalised complexity prior for the range: $P(r < 50km) = 0.5$ [@SorbyeRue2016].
 
 $$r = \frac{\sqrt{8\lambda}}{\kappa}$$
+
+## Mesh
+
+INLA uses a Stochastic Partial Differential Equation (SPDE) approach to fit the GMRF.
+This approximates the GRMF through a triangular mesh.
+It estimates the GMRF only at the vertices of the mesh.
+At other locations, it uses a linear interpolation of the vertices of the mesh triangle.
+
+The size of these triangles influences the resolution of the spatial pattern.
+Small triangles allow for a high resolution, but require more vertices and thus more compute time.
+Large triangles require less compute time at the cost of a lower resolution.
+As the data stems from a 1x1 km grid, we don't benefit from triangles with edge smaller than 1 km.
+We choose to generate meshes with edges of 10 km for Belgium and the Netherlands and 15 km for Great Britain.
+We created the mesh with the 50 km buffer around the locations with sufficient data density.
+
+```{r belgian-mesh, fig.cap = "Mesh for the Belgian data."}
+load_relevant(
+  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
+  buffer_locations = 50, country = "BE"
+) %>%
+  filter(buffer_count >= 50) %>%
+  semi_join(
+    x = read_vc("location", system.file(package = "ladybird")),
+    by = "location"
+  ) %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  st_transform(crs = 31370) %>%
+  st_buffer(50e3) %>%
+  st_union() %>%
+  st_buffer(50e3) %>%
+  st_buffer(-50e3) -> closing
+inla.mesh.2d(
+  boundary = as_Spatial(closing), max.edge = 10e3, cutoff = 5e3
+) -> mesh
+apply(
+  mesh$graph$tv[, 1:2], 1, function(x) {
+    list(st_linestring(mesh$loc[x, ]))
+  }
+) %>%
+  c(
+    apply(
+      mesh$graph$tv[, 2:3], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    ),
+    apply(
+      mesh$graph$tv[, c(1, 3)], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    )
+  ) %>%
+  unlist(recursive = FALSE) %>%
+  st_as_sfc(crs = 31370) -> segments
+border <- get_country_grid(dirname(params$maps), "BE", what = "borders")
+ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf()
+```
+
+```{r dutch-mesh, fig.cap = "Mesh for the Dutch data."}
+load_relevant(
+  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
+  buffer_locations = 50, country = "NL"
+) %>%
+  filter(buffer_count >= 50) %>%
+  semi_join(
+    x = read_vc("location", system.file(package = "ladybird")),
+    by = "location"
+  ) %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  st_transform(crs = 28992) %>%
+  st_buffer(50e3) %>%
+  st_union() %>%
+  st_buffer(50e3) %>%
+  st_buffer(-50e3) -> closing
+inla.mesh.2d(
+  boundary = as_Spatial(closing), max.edge = 10e3, cutoff = 5e3
+) -> mesh
+apply(
+  mesh$graph$tv[, 1:2], 1, function(x) {
+    list(st_linestring(mesh$loc[x, ]))
+  }
+) %>%
+  c(
+    apply(
+      mesh$graph$tv[, 2:3], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    ),
+    apply(
+      mesh$graph$tv[, c(1, 3)], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    )
+  ) %>%
+  unlist(recursive = FALSE) %>%
+  st_as_sfc(crs = 28992) -> segments
+border <- get_country_grid(dirname(params$maps), "NL", what = "borders")
+ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf()
+```
+
+```{r great-britain-mesh, fig.cap = "Mesh for the British data."}
+load_relevant(
+  min_occurrences = 1000, min_species = 3, buffer_distance = 50e3,
+  buffer_locations = 50, country = "GB"
+) %>%
+  filter(buffer_count >= 50) %>%
+  semi_join(
+    x = read_vc("location", system.file(package = "ladybird")),
+    by = "location"
+  ) %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  st_transform(crs = 27700) %>%
+  st_buffer(50e3) %>%
+  st_union() %>%
+  st_buffer(50e3) %>%
+  st_buffer(-50e3) -> closing
+inla.mesh.2d(
+  boundary = as_Spatial(closing), max.edge = 15e3, cutoff = 5e3
+) -> mesh
+apply(
+  mesh$graph$tv[, 1:2], 1, function(x) {
+    list(st_linestring(mesh$loc[x, ]))
+  }
+) %>%
+  c(
+    apply(
+      mesh$graph$tv[, 2:3], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    ),
+    apply(
+      mesh$graph$tv[, c(1, 3)], 1, function(x) {
+        list(st_linestring(mesh$loc[x, ]))
+      }
+    )
+  ) %>%
+  unlist(recursive = FALSE) %>%
+  st_as_sfc(crs = 27700) -> segments
+border <- get_country_grid(dirname(params$maps), "GB", what = "borders")
+
+ggplot(segments) + geom_sf(data = border, fill = inbo_hoofd) + geom_sf() +
+  coord_sf(xlim = st_bbox(segments)[c(1, 3)], ylim = st_bbox(segments)[c(2, 4)])
+```
 
 # Comparing fits
 
@@ -243,7 +463,7 @@ The arrow points forward in time.
 - arrow points for upper right to lower left: species occurrence decreases when the occurence of _H. axyridis_ decreases
 - arrow points for lower right to upper left: species occurrence increases when the occurence of _H. axyridis_ decreases
 
-```{r trend-compare-be}
+```{r trend-compare}
 trend %>%
   filter(species != "Harm_axyr") %>%
   select(country, species, year, median) %>%
@@ -259,6 +479,10 @@ trend %>%
     ha_median2 = lead(ha_median),
     median2 = lead(median)
   ) -> trend_compare
+```
+
+
+```{r trend-compare-be, eval = any(trend_compare$country == "BE")}
 trend_compare %>%
   filter(!is.na(ha_median), !is.na(ha_median2), country == "BE") %>%
   ggplot(
@@ -273,7 +497,7 @@ trend_compare %>%
   ggtitle("Belgium, common y-axis")
 ```
 
-```{r trend-compare-be2}
+```{r trend-compare-be2, eval = any(trend_compare$country == "BE")}
 trend_compare %>%
   filter(!is.na(ha_median), !is.na(ha_median2), country == "BE") %>%
   ggplot(
@@ -288,7 +512,7 @@ trend_compare %>%
   ggtitle("Belgium, free y-axis")
 ```
 
-```{r trend-compare-nl}
+```{r trend-compare-nl, eval = any(trend_compare$country == "NL")}
 trend_compare %>%
   filter(!is.na(ha_median), !is.na(ha_median2), country == "NL") %>%
   ggplot(
@@ -303,7 +527,7 @@ trend_compare %>%
   ggtitle("The Netherlands, common y-axis")
 ```
 
-```{r trend-compare-nl2}
+```{r trend-compare-nl2, eval = any(trend_compare$country == "NL")}
 trend_compare %>%
   filter(!is.na(ha_median), !is.na(ha_median2), country == "NL") %>%
   ggplot(
@@ -316,6 +540,36 @@ trend_compare %>%
   scale_y_continuous("occurrence species", labels = percent) +
   facet_wrap(~species, scales = "free_y") +
   ggtitle("The Netherlands, free y-axis")
+```
+
+```{r trend-compare-gb, eval = any(trend_compare$country == "GB")}
+trend_compare %>%
+  filter(!is.na(ha_median), !is.na(ha_median2), country == "GB") %>%
+  ggplot(
+    aes(
+      x = ha_median, xend = ha_median2, y = median, yend = median2
+    )
+  ) +
+  geom_segment(arrow = arrow(length = unit(2, "mm"))) +
+  scale_x_continuous("occurrence H. axiridis", labels = percent) +
+  scale_y_continuous("occurrence species", labels = percent) +
+  facet_wrap(~species) +
+  ggtitle("Great Britain, common y-axis")
+```
+
+```{r trend-compare-gb2, eval = any(trend_compare$country == "GB")}
+trend_compare %>%
+  filter(!is.na(ha_median), !is.na(ha_median2), country == "GB") %>%
+  ggplot(
+    aes(
+      x = ha_median, xend = ha_median2, y = median, yend = median2
+    )
+  ) +
+  geom_segment(arrow = arrow(length = unit(2, "mm"))) +
+  scale_x_continuous("occurrence H. axiridis", labels = percent) +
+  scale_y_continuous("occurrence species", labels = percent) +
+  facet_wrap(~species, scales = "free_y") +
+  ggtitle("Great Britain, free y-axis")
 ```
 
 ## Trends on the logit scale
@@ -441,8 +695,8 @@ hyperpar %>%
   ) %>%
   ggplot(
     aes(
-      x = mean, xmin = `0.025quant`, xmax = `0.975quant`, y = species,
-      colour = country
+      x = mean / 1e3, xmin = `0.025quant` / 1e3, xmax = `0.975quant` / 1e3,
+      y = species, colour = country
     )
   ) +
   geom_vline(xintercept = c(10, 50), linetype = 4) +
@@ -491,3 +745,5 @@ hyperpar %>%
   ggtitle("Rho of the spatio-temporal field in km") +
   theme(axis.title = element_blank())
 ```
+
+# References
