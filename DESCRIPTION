@@ -1,7 +1,7 @@
 Type: Package
 Package: ladybird
 Title: Analysis of Ladybird Occurrence Data
-Version: 0.0.2
+Version: 0.0.3
 Authors@R:
     c(person(given = "Thierry",
              family = "Onkelinx",
@@ -31,23 +31,29 @@ Imports:
     assertthat,
     curl,
     dplyr,
+    effectclass,
     git2rdata,
     leaflet,
     magrittr,
     pROC,
+    purrr,
     readr,
     rlang,
     sf,
     shiny,
+    stringr,
     tibble,
     tidyr,
-    tidyselect
+    tidyselect,
+    units
 Suggests:
     INBOtheme,
+    ggdendro,
     here,
     plotly,
     scales
 Remotes:
+    inbo/effectclass,
     inbo/inbotheme
 Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8

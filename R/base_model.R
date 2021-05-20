@@ -111,6 +111,10 @@ add_knots <- function(data, knots =  c(1990, 2000, 2010, 2020)) {
     as.matrix() %>%
     as.data.frame() %>%
     `colnames<-`(paste0("knot_", knots)) %>%
-    select_if(function(x){max(x) > 0}) %>%
+    select_if(
+      function(x) {
+        max(x) > 0
+      }
+    ) %>%
     bind_cols(data)
 }

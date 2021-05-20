@@ -1,6 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^checklist.yml$
+^data-raw$
 ^README\.Rmd$
 ^\.github$
 ^codecov\.yml$

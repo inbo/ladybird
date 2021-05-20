@@ -56,15 +56,13 @@ load_relevant <- function(
     mutate(
       buffer_count = rowSums(obs_dist <= as_units(buffer_distance, "m"))
     )
-  suppressWarnings(
-    {
-      locations %>%
-        filter(.data$buffer_count >= buffer_locations) %>%
-        st_buffer(buffer_distance) %>%
-        st_union() %>%
-        st_intersection(x = locations) -> locations
-    }
-  )
+  suppressWarnings({
+    locations %>%
+      filter(.data$buffer_count >= buffer_locations) %>%
+      st_buffer(buffer_distance) %>%
+      st_union() %>%
+      st_intersection(x = locations) -> locations
+  })
 
   locations %>%
     st_drop_geometry() %>%

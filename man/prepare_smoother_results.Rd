@@ -7,7 +7,12 @@
 prepare_smoother_results(models = ".", maps = ".", output = ".")
 }
 \arguments{
-\item{models_path}{the path to the individual model results}
+\item{models}{the path to the individual model results}
+
+\item{maps}{Location of the Natural Earth Data.
+See \code{get_country_grid()}.}
+
+\item{output}{the path for the output file}
 }
 \description{
 Prepare the results from the smoother models for the report

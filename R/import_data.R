@@ -5,6 +5,9 @@
 #' @param netherlands_occurrence path to the CSV file with the Dutch occurrence
 #' data.
 #' @param netherlands_visits path to the CSV file with the Dutch visit data.
+#' @param gb_occurrence path to the CSV file with the British occurrence
+#' data.
+#' @param gb_visits path to the CSV file with the British visit data.
 #' @param output path to the root of the data package
 #' @inheritParams git2rdata::write_vc
 #' @export
@@ -56,8 +59,6 @@ import_data <- function(
   )
   raw_nl_visit <- read_delim(netherlands_visits, delim = ";", locale = locale())
   assert_that(all(has_name(raw_nl_visit, c("year", "utm1km", "nDayVisits"))))
-  raw_netherlands  %>%
-    mutate(utm1km = sprintf("%06i", .data$utm1km)) -> raw_netherlands
   raw_netherlands %>%
     filter(.data$year >= 1990) %>%
     distinct(.data$year, .data$utm1km) %>%
@@ -102,7 +103,7 @@ import_data <- function(
     ) -> raw_belgium
   raw_netherlands %>%
     mutate(
-      centroid_x = .data$centroid_x * 1000,
+      centroid_x = as.numeric(.data$centroid_x) * 1000,
       centroid_y = .data$centroid_y * 1000
     ) %>%
     st_as_sf(

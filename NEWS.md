@@ -1,3 +1,8 @@
+# ladybird 0.0.3
+
+* Create functions:
+    * `smoother_model()`
+
 # ladybird 0.0.2
 
 * Create functions:

@@ -1,6 +1,9 @@
 #' Prepare the results from the smoother models for the report
 #'
-#' @param models_path the path to the individual model results
+#' @param models the path to the individual model results
+#' @param maps Location of the Natural Earth Data.
+#'  See `get_country_grid()`.
+#' @param output the path for the output file
 #' @export
 #' @importFrom assertthat assert_that is.string
 #' @importFrom dplyr arrange bind_cols bind_rows mutate %>%
@@ -15,10 +18,9 @@ prepare_smoother_results <- function(models = ".", maps = ".", output = ".") {
   maps <- normalizePath(maps)
   assert_that(is.string(output))
   output <- normalizePath(output)
-  list.files(models_path, full.names = TRUE, recursive = TRUE) %>%
+  list.files(models, full.names = TRUE, recursive = TRUE) %>%
     map(readRDS) -> base_models
   species <- map_chr(base_models, "species")
-  waic <- map_dbl(base_models, "waic")
   country <- map_chr(base_models, "country")
   map(base_models, "hyperpar") %>%
     map(rownames_to_column, var = "parameter") %>%

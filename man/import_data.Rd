@@ -26,6 +26,11 @@ data.}
 
 \item{netherlands_visits}{path to the CSV file with the Dutch visit data.}
 
+\item{gb_occurrence}{path to the CSV file with the British occurrence
+data.}
+
+\item{gb_visits}{path to the CSV file with the British visit data.}
+
 \item{output}{path to the root of the data package}
 
 \item{strict}{What to do when the metadata changes. \code{strict = FALSE}

@@ -112,7 +112,7 @@ fit_model <- function(
     lc_base %>%
       mutate(
         across(
-          ends_with("secondary"), function(x){
+          ends_with("secondary"), function(x) {
             NA
           }
         )
@@ -121,7 +121,7 @@ fit_model <- function(
         lc_base %>%
           mutate(
             across(
-              paste0("knot_", knots), function(x){
+              paste0("knot_", knots), function(x) {
                 NA
               }
             ),
@@ -131,7 +131,7 @@ fit_model <- function(
           mutate(decade = paste0(.data$decade, ":1"))
       ) -> lc_base
     lc_base %>%
-      select(-decade) %>%
+      select(-.data$decade) %>%
       is.na() %>%
       apply(1, all) -> all_na
     lc_base <- lc_base[!all_na, ]
