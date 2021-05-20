@@ -134,7 +134,7 @@ The second order random walk models the average change over time.
 A first order random walk models the difference between consecutive years.
 A second order random models the difference between consecutive first order differences.
 The random steps follow a Gaussian distribution with mean $0$ and variance $\sigma^2_r$.
-We set a penalised complexity prior for the precision: $P(\sigma_r > 0.05) = 0.01$ [@SorbyeRue2016].
+We set a penalised complexity prior for the precision: $P(\sigma_r > 0.2) = 0.01$ [@SorbyeRue2016].
 This favours smaller values for $\sigma_r$.
 The wiggliness of the smoother depends on the value of $\sigma_r$.
 When $\sigma_r = 0$, the resulting smoother is a straight line.
@@ -145,14 +145,14 @@ $$(b_{t + 1} - b_t) - (b_t - b_{t - 1}) \sim \mathcal{N}(0, \sigma^2_r)$$
 
 We model the spatio-temporal autocorrelation $\omega_{tx}$ as an AR-1 correlation between Gaussian Markhov Random Fields (GMRF) $\xi_{tx}$.
 $\rho$ is temporal autocorrelation between two consecutive GMRF's.
-We set a penalised complexity prior for the correlation: $P(\rho > 0.6) = 0.7$ [@SorbyeRue2016].
+We set a penalised complexity prior for the correlation: $P(\rho > 0.9) = 0.9$ [@SorbyeRue2016].
 
 $$\omega_{tx} = \rho\omega_{t-1x} + \xi_{tx}$$
 
 The individual GRMF $\xi_{tx}$ are independent but share the $r$ and $\sigma^2_s$ parameters.
 $\sigma^2_s$ is variance of the GMRF at distances larger than $r$.
 While $C(\Delta_{xy})$ the distance based correlation between locations $x$ and $y$, with $\Delta_{xy}$ being the distance between locations $x$ and $y$.
-We set a penalised complexity prior for the precision: $P(\sigma_s > 0.1) = 0.05$ [@SorbyeRue2016].
+We set a penalised complexity prior for the precision: $P(\sigma_s > 1) = 0.05$ [@SorbyeRue2016].
 
 $$\xi_x \sim \mathcal{N}(0, \sigma^2_sC(\Delta_{xy}))$$
 
@@ -462,7 +462,7 @@ hyperpar %>%
   ggplot(
     aes(x = median, xmin = lcl, xmax = ucl, y = species, colour = country)
   ) +
-  geom_vline(xintercept = 0.05, linetype = 4) +
+  geom_vline(xintercept = 0.2, linetype = 4) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   ggtitle("Stdev for the random walk") +
@@ -500,7 +500,7 @@ hyperpar %>%
       colour = country
     )
   ) +
-  geom_vline(xintercept = 0.1, linetype = 4) +
+  geom_vline(xintercept = 1, linetype = 4) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   scale_x_continuous(limits = c(0, NA)) +
@@ -518,7 +518,7 @@ hyperpar %>%
       colour = country
     )
   ) +
-  geom_vline(xintercept = 0.6, linetype = 4) +
+  geom_vline(xintercept = 0.9, linetype = 4) +
   geom_errorbarh(position = position_dodge(width = 0.5)) +
   geom_point(position = position_dodge(width = 0.5)) +
   ggtitle("Rho of the spatio-temporal field in km") +

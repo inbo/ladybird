@@ -47,7 +47,7 @@ smooth_model <- function(
       .data$year, .data$location, .data$X, .data$Y, .data$visits,
       .data$buffer_count, occurrence = !!species
     ) %>%
-    filter(.data$year >= min(.data$year[.data$occurrence == 1]) - 1) %>%
+    filter(.data$year >= min(.data$year[.data$occurrence == 1]) - 2) %>%
     mutate(
       log_visits = log(.data$visits),
       iyear = .data$year - min(.data$year) + 1
@@ -65,7 +65,7 @@ smooth_model <- function(
     boundary = mesh_buffer, max.edge = cellsize, cutoff = cellsize / 2
   ) -> mesh
   spde <- inla.spde2.pcmatern(
-    mesh = mesh, prior.range = c(50e3, 0.5), prior.sigma = c(0.1, 0.05)
+    mesh = mesh, prior.range = c(50e3, 0.5), prior.sigma = c(1, 0.01)
   )
   base_data %<>%
     st_drop_geometry()
@@ -110,13 +110,13 @@ smooth_model <- function(
   model_formula <- occurrence ~ 0 + intercept + log_visits +
     f(
       iyear, model = "rw2",
-      hyper = list(theta = list(prior = "pc.prec", param = c(0.05, 0.01)))
+      hyper = list(theta = list(prior = "pc.prec", param = c(0.2, 0.01)))
     ) +
     f(
       site, model = spde, group = site.group,
       control.group = list(
         model = "ar1",
-        hyper = list(theta = list(prior = "pc.cor1", param = c(0.6, 0.7)))
+        hyper = list(theta = list(prior = "pc.cor1", param = c(0.9, 0.9)))
       )
     )
   m0 <- inla(
