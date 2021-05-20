@@ -12,7 +12,8 @@ import_data(
   gb_occurrence,
   gb_visits,
   output,
-  strict = TRUE
+  strict = TRUE,
+  latest_year = 2020
 )
 }
 \arguments{
@@ -37,6 +38,9 @@ data.}
 overwrites the data and the metadata with a warning listing the changes,
 \code{strict = TRUE} returns an error and leaves the data and metadata as is.
 Defaults to \code{TRUE}.}
+
+\item{latest_year}{Don't import data more recent than this year.
+Defaults to 2020.}
 }
 \description{
 Import and standardise the raw data

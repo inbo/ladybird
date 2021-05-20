@@ -10,6 +10,8 @@
 #' @param gb_visits path to the CSV file with the British visit data.
 #' @param output path to the root of the data package
 #' @inheritParams git2rdata::write_vc
+#' @param latest_year Don't import data more recent than this year.
+#' Defaults to 2020.
 #' @export
 #' @importFrom assertthat assert_that has_name is.string
 #' @importFrom git2rdata repository write_vc
@@ -20,7 +22,8 @@
 #' @importFrom sf st_as_sf st_coordinates st_transform
 import_data <- function(
   belgium_occurrence, belgium_visits, netherlands_occurrence,
-  netherlands_visits, gb_occurrence, gb_visits, output, strict = TRUE
+  netherlands_visits, gb_occurrence, gb_visits, output, strict = TRUE,
+  latest_year = 2020
 ) {
   assert_that(is.string(belgium_occurrence), is.string(belgium_visits))
   assert_that(is.string(netherlands_occurrence), is.string(netherlands_visits))
@@ -38,7 +41,7 @@ import_data <- function(
   raw_bel_visit <- read_delim(belgium_visits, delim = ";", locale = locale())
   assert_that(all(has_name(raw_bel_visit, c("year", "utm1km", "nDayVisits"))))
   raw_belgium %>%
-    filter(.data$year >= 1990) %>%
+    filter(.data$year >= 1990 & .data$year <= latest_year) %>%
     distinct(.data$year, .data$utm1km) %>%
     anti_join(raw_bel_visit, by = c("year", "utm1km")) %>%
     nrow() -> missing_visits
@@ -60,7 +63,7 @@ import_data <- function(
   raw_nl_visit <- read_delim(netherlands_visits, delim = ";", locale = locale())
   assert_that(all(has_name(raw_nl_visit, c("year", "utm1km", "nDayVisits"))))
   raw_netherlands %>%
-    filter(.data$year >= 1990) %>%
+    filter(.data$year >= 1990 & .data$year <= latest_year) %>%
     distinct(.data$year, .data$utm1km) %>%
     anti_join(raw_nl_visit, by = c("year", "utm1km")) %>%
     nrow() -> missing_visits
@@ -80,7 +83,7 @@ import_data <- function(
   raw_gb_visit <- read_delim(gb_visits, delim = ";", locale = locale())
   assert_that(all(has_name(raw_gb_visit, c("year", "utm1km", "nDayVisits"))))
   raw_gb %>%
-    filter(.data$year >= 1990) %>%
+    filter(.data$year >= 1990 & .data$year <= latest_year) %>%
     distinct(.data$year, .data$utm1km) %>%
     anti_join(raw_gb_visit, by = c("year", "utm1km")) %>%
     nrow() -> missing_visits
@@ -132,13 +135,14 @@ import_data <- function(
     ) -> raw_gb
   raw_belgium %>%
     bind_rows(raw_netherlands, raw_gb) %>%
-    filter(.data$year >= 1990) %>%
+    filter(.data$year >= 1990 & .data$year <= latest_year) %>%
     mutate(
       location = factor(.data$location),
       taxon_key = factor(.data$taxon_key)
     ) -> raw_data
   raw_bel_visit %>%
     bind_rows(raw_nl_visit, raw_gb_visit) %>%
+    filter(.data$year >= 1990 & .data$year <= latest_year) %>%
     transmute(
       .data$year,
       location = factor(.data$utm1km, levels = levels(raw_data$location)),
