@@ -64,6 +64,8 @@ library(tidyverse)
 library(scales)
 library(INBOtheme)
 library(sf)
+library(vegan)
+library(ggdendro)
 library(ladybird)
 ```
 
@@ -356,6 +358,82 @@ trend_compare %>%
   facet_wrap(~species, scales = "free_y") +
   ggtitle("Great Britain, free y-axis")
 ```
+
+```{r order-trend-10}
+lincomb %>%
+  filter(duration == "10") -> lc
+lc %>%
+  distinct(country, species) %>%
+  mutate(id = row_number()) -> country_species
+expand.grid(
+  id.x = country_species$id,
+  id.y = country_species$id
+) %>%
+  inner_join(country_species, by = c("id.x" = "id")) %>%
+  inner_join(country_species, by = c("id.y" = "id")) %>%
+  inner_join(
+    lc %>%
+      select(country, species, center, median),
+    by = c("country.x" = "country", "species.x" = "species")
+  ) %>%
+  inner_join(
+    lc %>%
+      select(country, species, center, median),
+    by = c("country.y" = "country", "species.y" = "species", "center")
+  ) %>%
+  mutate(delta = median.x - median.y) %>%
+  group_by(id.x, id.y) %>%
+  summarise(distance = sqrt(mean(delta ^ 2)), .groups = "drop") %>%
+  pivot_wider(names_from = id.y, values_from = distance) %>%
+  select(-id.x) %>%
+  as.matrix() -> trend_distance
+mds <- monoMDS(trend_distance, k = 1, model = "loc")
+country_species %>%
+  mutate(mds = mds$points[, 1]) %>%
+  inner_join(lc, by = c("country", "species")) %>%
+  select(country, species, center, change, mds) -> order_trend_10
+
+lincomb %>%
+  filter(duration == 10) %>%
+  select(country, species, center, median) %>%
+  pivot_wider(names_from = center, values_from = median) %>%
+  as.data.frame() -> lc
+rownames(lc) <- paste(lc$country, lc$species, sep = "_")
+lc %>%
+  select(-country, -species) %>%
+  as.matrix() %>%
+  vegdist(method = "euclidean", na.rm = TRUE) -> trend_dist
+trend_dist %>%
+  monoMDS(model = "local", k = 1) %>%
+  scores() %>%
+  as.data.frame() %>%
+  rownames_to_column("id") %>%
+  inner_join(
+    lincomb %>%
+      filter(duration == 10) %>%
+      select(country, species, center, change) %>%
+      mutate(id = paste(country, species, sep = "_")),
+    by = "id"
+  ) %>%
+  mutate(id = reorder(id, MDS1)) -> order_trend_10
+```
+
+```{r trend-table, fig.cap = "Linear trends in 10 year moving windows", fig.height = 7}
+man_colt <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
+man_colt[4] <- inbo_steun_blauw
+names(man_colt) <- c("++", "+", "+~", "~", "-~", "-", "--", "?+", "?-", "?")
+ggplot(order_trend_10, aes(y = id, x = center, colour = change)) +
+  geom_point(size = 5, aes(colour = change), show.legend = FALSE) +
+  geom_text(aes(label = change), show.legend = FALSE, colour = "white") +
+  scale_colour_manual(values = man_colt) +
+  theme(axis.title = element_blank())
+```
+
+```{r trend-dendrogram, fig.cap = "Hierarchical clustering of species based on their ten year moving trends."}
+hclust(trend_dist) %>%
+  ggdendrogram(rotate = TRUE)
+```
+
 
 ## Trends on the logit scale
 

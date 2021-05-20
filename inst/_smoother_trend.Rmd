@@ -23,9 +23,6 @@ lincomb %>%
     species = factor(species) %>%
       relevel(this$species)
   ) -> this_lincomb
-man_colt <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
-man_colt[4] <- inbo_steun_blauw
-names(man_colt) <- levels(this_lincomb$change)
 man_col <- c(rev(traffic_palette(7)), "grey75", "grey25", "grey50")
 man_col[4] <- inbo_steun_blauw
 names(man_col) <- levels(this_predictions$presence)
