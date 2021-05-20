@@ -8,11 +8,12 @@ taxon_key	scientific_name	code
 7	Aphidecta obliterata	Aphi_obli
 8	Chilocorus bipustulatus	Chil_bipu
 9	Coccinula quatuordecimpustulata	Cocc_quat
-10	Propylaea quatuordecimpunctata	Prop_quat
+10	Propylea quatuordecimpunctata	Prop_quat
 11	Anisosticta novemdecimpunctata	Anis_nove
 37	Adalia conglomerata	Adal_cong
 12	Adalia decempunctata	Adal_dece
 13	Calvia decemguttata	Calv_dece
+41	Calvia quindecimguttata	Calv_quin
 14	Myrrha octodecimguttata	Myrr_octo
 15	Psyllobora vigintiduopunctata	Psyl_vigi
 16	Halyzia sedecimguttata	Haly_sede
@@ -34,6 +35,6 @@ taxon_key	scientific_name	code
 31	Coccinella quinquepunctata	Cocc_quin
 32	Coccinella magnifica	Cocc_magn
 33	Oenopia conglobata	Oeno_cong
-34	Brumus quadripustulatus	Brum_quad
+34	Exochomus quadripustulatus	Exoc_quad
 35	Oenopia impustulata	Oeno_impu
-39	Ceratomegilla undecimnotata	Cera_unde
+42	Ceratomegilla undecimnotata	Cera_unde
