@@ -2,6 +2,7 @@
 #' @inheritParams load_relevant
 #' @inheritParams base_model
 #' @inheritParams get_country_grid
+#' @param n_timesteps the number of time slices of the spatio temporal pattern.
 #' @export
 #' @importFrom assertthat assert_that is.flag noNA
 #' @importFrom dplyr arrange bind_cols bind_rows distinct inner_join mutate
@@ -18,7 +19,7 @@
 smooth_model <- function(
   species = "Harm_axyr", min_occurrences = 1000, min_species = 3,
   country = c("BE", "GB", "NL", "all"), path = ".", cellsize = 10e3,
-  buffer_distance = 50e3, buffer_locations = 50
+  buffer_distance = 50e3, buffer_locations = 50, n_timestep = 4
 ) {
   which_country <- match.arg(country)
   crs <- c(BE = 31370, GB = 27700, NL = 28992, all = 3035)
@@ -60,7 +61,12 @@ smooth_model <- function(
     st_buffer(buffer_distance) %>%
     st_buffer(-buffer_distance) %>%
     as_Spatial() -> mesh_buffer
-  time_mesh <- inla.mesh.1d(loc = pretty(base_data$year, 3))
+
+  delta_time <- floor(diff(range(base_data$year)) / (n_timestep - 1))
+  time_mesh <- seq(
+    max(base_data$year), min(base_data$year) - delta_time + 1, by = -delta_time
+  )
+  time_mesh <- inla.mesh.1d(loc = time_mesh)
   inla.mesh.2d(
     boundary = mesh_buffer, max.edge = cellsize, cutoff = cellsize / 2
   ) -> mesh

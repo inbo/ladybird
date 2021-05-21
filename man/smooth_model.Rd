@@ -12,7 +12,8 @@ smooth_model(
   path = ".",
   cellsize = 10000,
   buffer_distance = 50000,
-  buffer_locations = 50
+  buffer_locations = 50,
+  n_timestep = 4
 )
 }
 \arguments{
@@ -36,6 +37,8 @@ Defaults to 10.000 m.}
 
 \item{buffer_locations}{The minimal number of locations with suffient data
 within the buffer range}
+
+\item{n_timesteps}{the number of time slices of the spatio temporal pattern.}
 }
 \description{
 Fit a base model to a species
