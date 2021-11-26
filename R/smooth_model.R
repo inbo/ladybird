@@ -62,7 +62,7 @@ smooth_model <- function(
     st_buffer(-buffer_distance) %>%
     as_Spatial() -> mesh_buffer
 
-  delta_time <- floor(diff(range(base_data$year)) / (n_timestep - 1))
+  delta_time <- sort(floor(diff(range(base_data$year)) / (n_timestep - 1)))
   time_mesh <- seq(
     max(base_data$year), min(base_data$year) - delta_time + 1, by = -delta_time
   )
